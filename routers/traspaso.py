@@ -1,0 +1,93 @@
+import mysql.connector
+from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+from typing import List
+import os
+from dotenv import load_dotenv
+
+router =APIRouter(prefix="/zeutica",tags=["/traspasos"],responses={404: {"Mensaje":"No encontrado"}})
+load_dotenv()
+
+# Configuración de la conexión
+def get_db_connection():
+    return mysql.connector.connect(
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        database=os.getenv("DB_NAME")
+    )
+
+class traspaso(BaseModel): # molde para recibir informacion de traspaso
+    sku: str
+    cantidad: int
+
+class LoteTraspaso(BaseModel):
+    usuario: str
+    movimientos: List[traspaso]
+
+@router.post("/traspaso")
+async def traspaso_multiple(lote: LoteTraspaso):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    
+    try:
+        # Iniciamos el proceso para todos los items
+        for item in lote.movimientos:
+            # A. Verificar stock
+            cursor.execute("SELECT cantidad FROM productos WHERE sku = %s", (item.sku,))
+            res = cursor.fetchone()
+            
+            if not res or res['cantidad'] < item.cantidad:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Error en SKU {item.sku}: Stock insuficiente o no existe."
+                )
+
+            # B. Actualización doble: Resta de 'cantidad', suma a 'full'
+            sql_update = """
+                UPDATE productos 
+                SET cantidad = cantidad - %s, 
+                    stock_full = stock_full + %s 
+                WHERE sku = %s
+            """
+            cursor.execute(sql_update, (item.cantidad,item.cantidad, item.sku))
+
+            # C. Historial
+            cursor.execute(
+                "INSERT INTO stock_actual (sku, cantidad) VALUES (%s, %s)",
+                (item.sku, item.cantidad)
+            )
+
+        # D. Si TODO salió bien, guardamos cambios en MySQL
+        connection.commit()
+        return {"status": "success", "mensaje": f"{len(lote.movimientos)} movimientos procesados"}
+
+    except Exception as e:
+        connection.rollback() # Si uno falla, ninguno se guarda (mantiene integridad)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
+        connection.close()
+
+@router.get("/traspasos/reporte") # Endpoint para consultar traspasos realizados.
+async def consulta_traspasos():
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+
+    sql = ("SELECT sku, cantidad, fecha_registro FROM stock_actual")
+
+    try:
+        cursor.execute(sql)
+        tras = cursor.fetchall()
+
+        if not tras:
+            raise HTTPException(status_code=404, detail="No se han encontrado registro de traspasos")
+        
+        return tras
+    
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+    
+    finally:
+        cursor.close()
+        connection.close()
