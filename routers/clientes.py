@@ -31,6 +31,9 @@ class clienteRfc(Cliente): # molde con herencia para cliente factura
     cp: Optional[int] = None
     regimen: Optional[str] = None
     usocdfi: Optional[str] = None
+
+class clienteEditar(clienteRfc): # molde para editar cliente con id
+    id: int
     
 @router.get("/clientes") #Endpoint para consultar clientes en base de datos
 async def obtener_clientes():
@@ -63,7 +66,7 @@ async def cliente_nuevo(cliente: clienteRfc):
 
     # El Query de inserción
     query = """
-        INSERT INTO clientes (nombre, email, empresa,contacto, telefono, direccion, rfc, cp, regimen, usocfdi) 
+        INSERT INTO clientes (nombre, email, empresa, contacto, telefono, direccion, rfc, cp, regimen, usocfdi) 
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
 
@@ -82,4 +85,41 @@ async def cliente_nuevo(cliente: clienteRfc):
     finally:
         cursor.close()
         conn.close()
+
+
+@router.post("/editcliente") # Endpoint para editar cliente existente en la base de datos
+async def edit_cliente(cliente: clienteEditar):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # El Query de actualización
+    query = """
+        UPDATE clientes 
+        SET nombre = %s, email = %s, empresa = %s, contacto = %s, telefono = %s, 
+            direccion = %s, rfc = %s, cp = %s, regimen = %s, usocfdi = %s
+        WHERE id = %s
+    """
+
+    # Extraemos los valores del objeto cliente (el id va al final)
+    valores = (cliente.nombre, cliente.email, cliente.empresa, cliente.contacto, cliente.telefono, 
+               cliente.direccion, cliente.rfc, cliente.cp, cliente.regimen, cliente.usocdfi, cliente.id)
+
+    try:
+        cursor.execute(query, valores)
+        conn.commit() # ¡Vital para guardar en MySQL!
+        
+        # Aquí checo si realmente se actualizó un registro
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        
+        return {"mensaje": "Cliente actualizado con éxito", "id": cliente.id}
+    
+    except mysql.connector.Error as err:
+        conn.rollback() # Si falla, cancelamos la operación
+        raise HTTPException(status_code=500, detail=f"Error en DB: {err}")
+    
+    finally:
+        cursor.close()
+        conn.close()
+
 

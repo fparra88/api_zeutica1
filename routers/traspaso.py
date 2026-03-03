@@ -19,7 +19,7 @@ def get_db_connection():
 
 class traspaso(BaseModel): # molde para recibir informacion de traspaso
     sku: str
-    cantidad: int
+    stock_bodega: int
 
 class LoteTraspaso(BaseModel):
     usuario: str
@@ -34,10 +34,10 @@ async def traspaso_multiple(lote: LoteTraspaso):
         # Iniciamos el proceso para todos los items
         for item in lote.movimientos:
             # A. Verificar stock
-            cursor.execute("SELECT cantidad FROM productos WHERE sku = %s", (item.sku,))
+            cursor.execute("SELECT stock_bodega FROM productos WHERE sku = %s", (item.sku,))
             res = cursor.fetchone()
             
-            if not res or res['cantidad'] < item.cantidad:
+            if not res or res['stock_bodega'] < item.stock_bodega:
                 raise HTTPException(
                     status_code=400, 
                     detail=f"Error en SKU {item.sku}: Stock insuficiente o no existe."
@@ -46,11 +46,11 @@ async def traspaso_multiple(lote: LoteTraspaso):
             # B. Actualización doble: Resta de 'cantidad', suma a 'full'
             sql_update = """
                 UPDATE productos 
-                SET cantidad = cantidad - %s, 
+                SET stock_bodega = stock_bodega - %s, 
                     stock_full = stock_full + %s 
                 WHERE sku = %s
             """
-            cursor.execute(sql_update, (item.cantidad,item.cantidad, item.sku))
+            cursor.execute(sql_update, (item.stock_bodega,item.stock_bodega, item.sku))
 
             # C. Historial
             cursor.execute(

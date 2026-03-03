@@ -22,7 +22,7 @@ class VentaSchema(BaseModel):
     id_venta: int
     sku: str
     producto: str
-    cantidad: int
+    stock_bodega: int
     fecha: str
     nombreComprador: str
     otros: str
@@ -34,7 +34,7 @@ async def consultar_inventario_completo():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True) # Usamos dictionary=True para que devuelva claves como 'sku'
     
-    query = "SELECT id, sku, nombre, cantidad, stock_full, precio, precio_2, precio_3 FROM productos"
+    query = "SELECT id, sku, nombre, stock_bodega, stock_full, stock_fba, stock_total, precio, precio_2, precio_3 FROM productos"
     
     try:
         cursor.execute(query) 
@@ -58,7 +58,7 @@ async def obtener_producto_por_sku(sku: str):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)  
     # Usamos %s para prevenir inyección SQL
-    query = "SELECT id, sku, nombre, cantidad, stock_full, precio FROM productos WHERE sku = %s"
+    query = "SELECT id, sku, nombre, stock_bodega, stock_full, stock_fba, stock_total, precio, precio_2, precio_3 FROM productos WHERE sku = %s"
     try:
         cursor.execute(query, (sku,))    
         resultado = cursor.fetchone()
@@ -71,9 +71,13 @@ async def obtener_producto_por_sku(sku: str):
             "id": resultado['id'],
             "sku": resultado['sku'],            
             "nombre": resultado['nombre'],
-            "cantidad": resultado['cantidad'],
+            "stock_bodega": resultado['stock_bodega'],
             "stock_full": resultado['stock_full'],
-            "precio": resultado['precio']
+            "stock_fba": resultado['stock_fba'],
+            "stock_total": resultado['stock_total'],
+            "precio": resultado['precio'],
+            "precio_2": resultado['precio_2'],
+            "precio_3": resultado['precio_3']
             }
     
     except mysql.connector.Error as err:
@@ -91,24 +95,24 @@ async def registrar_venta(venta: VentaSchema):
         with connection.cursor(dictionary=True) as cursor:
             
             # A. Verificar stock
-            sql_check = "SELECT cantidad FROM productos WHERE sku = %s"
+            sql_check = "SELECT stock_bodega FROM productos WHERE sku = %s"
             cursor.execute(sql_check, (venta.sku,))
             resultado = cursor.fetchone()
 
             if not resultado:
                 raise HTTPException(status_code=404, detail="Producto no encontrado")
             
-            if resultado['cantidad'] < venta.cantidad:
-                raise HTTPException(status_code=400, detail=f"Stock insuficiente. Solo hay {resultado['cantidad']}")
+            if resultado['stock_bodega'] < venta.stock_bodega:
+                raise HTTPException(status_code=400, detail=f"Stock insuficiente. Solo hay {resultado['stock_bodega']}")
         
             # B. Aplicar el descuento al inventario
-            sql_restar = "UPDATE productos SET cantidad = cantidad - %s WHERE sku = %s" 
-            cursor.execute(sql_restar, (venta.cantidad, venta.sku))
+            sql_restar = "UPDATE productos SET stock_bodega = stock_bodega - %s WHERE sku = %s" 
+            cursor.execute(sql_restar, (venta.stock_bodega, venta.sku))
 
             # C. Registrar venta en el historial
             # CORRECCIÓN IMPORTANTE: Antes usabas 'query' aquí por error
-            sql_insert = "INSERT INTO ventasRegistro (id_ventas, sku, producto, cantidad, fecha, nombreComprador, otros, plataforma) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-            valores = (venta.id_venta, venta.sku, venta.producto, venta.cantidad, venta.fecha, venta.nombreComprador, venta.otros, venta.plataforma)
+            sql_insert = "INSERT INTO ventasRegistro (id_ventas, sku, producto, cantidad, fecha, nombreComprador, otros, plataforma) VALUES (%s, %s, %s, %s, %s, %s, %s,%s)"
+            valores = (venta.id_venta, venta.sku, venta.producto, venta.stock_bodega, venta.fecha, venta.nombreComprador, venta.otros, venta.plataforma)
             cursor.execute(sql_insert, valores)
 
             # D. Confirmar cambios
@@ -117,7 +121,7 @@ async def registrar_venta(venta: VentaSchema):
             return {
                 "message": "Venta aplicada exitosamente", 
                 "sku": venta.sku, 
-                "nuevo_stock": resultado['cantidad'] - venta.cantidad
+                "nuevo_stock": resultado['stock_bodega'] - venta.stock_bodega
             }
 
     except mysql.connector.Error as err:

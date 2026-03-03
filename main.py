@@ -1,7 +1,7 @@
 # fichero para backend
 import bcrypt
 from fastapi import FastAPI, HTTPException
-from routers import productos, ventas, clientes, traspaso, cotizaciones, gastos
+from routers import cotizacionesBack, productos, ventas, clientes, traspaso, gastos
 import mysql.connector
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -13,12 +13,12 @@ app.include_router(productos.router) # Router para api productos
 app.include_router(ventas.router) # Router para api ventas
 app.include_router(clientes.router) #Router para clientes
 app.include_router(traspaso.router) # Router para traspasos
-app.include_router(cotizaciones.router) # Router para cotizaciones
+app.include_router(cotizacionesBack.router) # Router para cotizaciones
 app.include_router(gastos.router) # Router para gastos operativos
 
 app.add_middleware(  # Middleware para controlar accesos.
     CORSMiddleware,
-    allow_origins=["http://localhost:8501/"], # En producción, pon aquí la URL de tu Streamlit
+    allow_origins=["*"], # En producción, pon aquí la URL de tu Streamlit
     allow_methods=["*"],
     allow_headers=["*"],
 )
