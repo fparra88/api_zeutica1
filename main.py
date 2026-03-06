@@ -18,7 +18,7 @@ app.include_router(gastos.router) # Router para gastos operativos
 
 app.add_middleware(  # Middleware para controlar accesos.
     CORSMiddleware,
-    allow_origins=["http://3.151.25.133:8501"], # En producción, pon aquí la URL de tu Streamlit
+    allow_origins=["*"], # En producción, pon aquí la URL de tu Streamlit
     allow_methods=["*"],
     allow_headers=["*"],
 )
