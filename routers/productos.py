@@ -23,6 +23,7 @@ class VentaSchema(BaseModel):
     sku: str
     producto: str
     stock_bodega: int
+    precio: float
     fecha: str
     nombreComprador: str
     otros: str
@@ -131,8 +132,8 @@ async def registrar_venta(venta: VentaSchema):
 
             # C. Registrar venta en el historial
             # CORRECCIÓN IMPORTANTE: Antes usabas 'query' aquí por error
-            sql_insert = "INSERT INTO ventasRegistro (id_ventas, sku, producto, cantidad, fecha, nombreComprador, otros, plataforma) VALUES (%s, %s, %s, %s, %s, %s, %s,%s)"
-            valores = (venta.id_venta, venta.sku, venta.producto, venta.stock_bodega, venta.fecha, venta.nombreComprador, venta.otros, venta.plataforma)
+            sql_insert = "INSERT INTO ventasRegistro (id_ventas, sku, producto, cantidad, precio, fecha, nombreComprador, otros, plataforma) VALUES (%s, %s, %s, %s, %s, %s, %s,%s)"
+            valores = (venta.id_venta, venta.sku, venta.producto, venta.stock_bodega, venta.precio, venta.fecha, venta.nombreComprador, venta.otros, venta.plataforma)
             cursor.execute(sql_insert, valores)
 
             # D. Confirmar cambios
