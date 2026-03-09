@@ -55,7 +55,7 @@ async def traspaso_multiple(lote: LoteTraspaso):
             # C. Historial
             cursor.execute(
                 "INSERT INTO stock_actual (sku, cantidad) VALUES (%s, %s)",
-                (item.sku, item.cantidad)
+                (item.sku, item.stock_bodega)
             )
 
         # D. Si TODO salió bien, guardamos cambios en MySQL
