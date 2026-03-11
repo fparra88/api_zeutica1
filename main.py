@@ -1,7 +1,7 @@
 # fichero para backend
 import bcrypt
 from fastapi import FastAPI, HTTPException
-from routers import cotizacionesBack, productos, ventas, clientes, traspaso, gastos
+from routers import cotizacionesBack, productos, ventas, clientes, traspaso, gastos, compras
 import mysql.connector
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -15,6 +15,7 @@ app.include_router(clientes.router) #Router para clientes
 app.include_router(traspaso.router) # Router para traspasos
 app.include_router(cotizacionesBack.router) # Router para cotizaciones
 app.include_router(gastos.router) # Router para gastos operativos
+app.include_router(compras.router) # Router para compras de productos
 
 app.add_middleware(  # Middleware para controlar accesos.
     CORSMiddleware,

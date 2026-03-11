@@ -133,7 +133,7 @@ async def consulta_cotizacion():
         # 1. Agregamos dictionary=True para que el JSON sea compatible con Streamlit
         with connection.cursor(dictionary=True) as cursor:
             cursor.execute("SELECT * FROM cotizaciones")
-            # 2. Cambiamos fetchone() por fetchall() para traer TODAS las filas
+            
             cotizaciones = cursor.fetchall() 
 
             if not cotizaciones:
@@ -180,3 +180,26 @@ async def vincular_factura(vinculos: List[VinculoFactura]):
         connection.close()
 
 
+@router.get("/cotizacion/{cotizacion_id}") # Endpoint para items de cotizacion
+async def obtener_items_cotizacion(cotizacion_id: int):
+    connection = get_db_connection()
+    
+    try:
+        with connection.cursor(dictionary=True) as cursor:
+            cursor.execute("SELECT * FROM cotizacion_items WHERE cotizacion_id = %s", (cotizacion_id,))
+            
+            # ¡AQUÍ ESTÁ EL CAMBIO CLAVE! Usamos fetchall()
+            items = cursor.fetchall() 
+            
+        if not items:
+            return []
+            
+        return items
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener items: {str(e)}"
+        )
+    finally:
+        connection.close()
