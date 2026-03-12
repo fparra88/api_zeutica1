@@ -5,7 +5,7 @@ from typing import Optional
 import os
 from dotenv import load_dotenv
 
-router =APIRouter(prefix="/zeutica",tags=["/clientes"],responses={404: {"Mensaje":"No encontrado"}})
+router =APIRouter(tags=["/clientes"],responses={404: {"Mensaje":"No encontrado"}})
 load_dotenv()
 
 # Configuración de la conexión

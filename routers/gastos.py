@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 import os
 from dotenv import load_dotenv
 
-router =APIRouter(prefix="/zeutica",tags=["/gastos"],responses={404: {"Mensaje":"No encontrado"}})
+router =APIRouter(tags=["/gastos"],responses={404: {"Mensaje":"No encontrado"}})
 load_dotenv()
 
 # Configuración de la conexión

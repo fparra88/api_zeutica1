@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import os
 import mysql.connector
 
-router = APIRouter(prefix="/zeutica",tags=["/compras"],responses={404: {"Mensaje":"No encontrado"}})
+router = APIRouter(tags=["/compras"],responses={404: {"Mensaje":"No encontrado"}})
 
 # Configuración de la conexión
 def get_db_connection():

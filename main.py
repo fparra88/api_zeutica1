@@ -1,29 +1,59 @@
 # fichero para backend
 import bcrypt
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from routers import cotizacionesBack, productos, ventas, clientes, traspaso, gastos, compras
 import mysql.connector
 from fastapi.middleware.cors import CORSMiddleware
-import os
+import os, secrets
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
-app = FastAPI(prefix="/zeutica",tags=["/login"],responses={404: {"Mensaje":"No encontrado"}})  # Instancia de main
+# --- 1. CONFIGURACIÓN DE SEGURIDAD Y ESTADO ---
+security = HTTPBearer()
 
-app.include_router(productos.router) # Router para api productos
-app.include_router(ventas.router) # Router para api ventas
-app.include_router(clientes.router) #Router para clientes
-app.include_router(traspaso.router) # Router para traspasos
-app.include_router(cotizacionesBack.router) # Router para cotizaciones
-app.include_router(gastos.router) # Router para gastos operativos
-app.include_router(compras.router) # Router para compras de productos
 
-app.add_middleware(  # Middleware para controlar accesos.
+# --- 2. DEPENDENCIA PARA VALIDAR EL TOKEN EN TUS RUTAS ---
+def obtener_usuario_actual(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        query = "SELECT nombre_usuario FROM usuarios WHERE token = %s"
+        cursor.execute(query, (token,))
+        resultado = cursor.fetchone()
+        if not resultado:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token inválido o expirado",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return resultado['nombre_usuario']
+    except mysql.connector.Error as err:
+        print(f"Error DB token: {err}")
+        raise HTTPException(status_code=500, detail="Error interno en DB")
+    finally:
+        cursor.close()
+        conn.close()
+
+# Corregido: FastAPI usa root_path, no prefix. 
+app = FastAPI(root_path="/zeutica", tags=["login"], responses={404: {"Mensaje":"No encontrado"}})
+
+app.include_router(productos.router, dependencies=[Depends(obtener_usuario_actual)])
+app.include_router(ventas.router, dependencies=[Depends(obtener_usuario_actual)])
+app.include_router(clientes.router, dependencies=[Depends(obtener_usuario_actual)])
+app.include_router(traspaso.router, dependencies=[Depends(obtener_usuario_actual)])
+app.include_router(cotizacionesBack.router, dependencies=[Depends(obtener_usuario_actual)])
+app.include_router(gastos.router, dependencies=[Depends(obtener_usuario_actual)])
+app.include_router(compras.router, dependencies=[Depends(obtener_usuario_actual)])
+
+app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # En producción, pon aquí la URL de tu Streamlit
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-load_dotenv() # Carga de credenciales .env
+load_dotenv()
 
 # Configuración de la conexión
 def get_db_connection():
@@ -34,46 +64,59 @@ def get_db_connection():
         database=os.getenv("DB_NAME")
     )
 
-      # // AUTENTICACION DE USUARIOS PARA INGRESO AL SOFTWARE // 
-# Función para encriptar al crear un usuario
+class LoginSchema(BaseModel): #molde para usuario
+    usuario: str
+    password: str
+
+# // AUTENTICACION DE USUARIOS PARA INGRESO AL SOFTWARE // 
 def hash_password(password: str) -> str:
-    # Generamos la sal y el hash
     pwd_bytes = password.encode('utf-8')
     salt = bcrypt.gensalt()
     hashed = bcrypt.hashpw(pwd_bytes, salt)
     return hashed.decode('utf-8')
 
-# Función para verificar al hacer login
 def verify_password(plano_password: str, hashed_password: str) -> bool:
     pwd_bytes = plano_password.encode('utf-8')
     hashed_bytes = hashed_password.encode('utf-8')
-    return bcrypt.checkpw(pwd_bytes, hashed_bytes)
+    return bcrypt.checkpw(pwd_bytes, hashed_bytes)   
 
 @app.get("/")
 async def test_server():
     return {"Servidor Conectado..."}
 
-@app.post("/login") # Endpoint para autenticar usuarios
-async def login(datos: dict):
-    usuario = datos.get("usuario")
-    password_ingresado = datos.get("password")
+@app.post("/login")
+async def login(datos: LoginSchema):
+    usuario = datos.usuario
+    password_ingresado = datos.password
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    
-    # 1. Buscamos el usuario en MySQL
-    query = "SELECT password_hash FROM usuarios WHERE nombre_usuario = %s"
-    cursor.execute(query, (usuario,))
-    resultado = cursor.fetchone()
-    
-    if resultado:
-        # 2. Verificamos la contraseña con bcrypt
-        hash_guardado = resultado['password_hash']
-        
-        if verify_password(password_ingresado, hash_guardado):
-            return {"auth": True, "mensaje": "Acceso exitoso"}
-    
-    # Si no existe el usuario o la contraseña no coincide
-    raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+    try:
+        query = "SELECT password_hash FROM usuarios WHERE nombre_usuario = %s"
+        cursor.execute(query, (usuario,))
+        resultado = cursor.fetchone()
+        if resultado:
+            hash_guardado = resultado['password_hash']
+            if verify_password(password_ingresado, hash_guardado):
+                # Genero y guardo el token en la base de datos
+                nuevo_token = secrets.token_urlsafe(32)
+                try:
+                    update_query = "UPDATE usuarios SET token = %s WHERE nombre_usuario = %s"
+                    cursor.execute(update_query, (nuevo_token, usuario))
+                    conn.commit()
+                except mysql.connector.Error as err:
+                    print(f"Error guardando token: {err}")
+                    raise HTTPException(status_code=500, detail="Error guardando token en DB")
+                return {
+                    "auth": True,
+                    "mensaje": "Acceso exitoso",
+                    "access_token": nuevo_token,
+                    "token_type": "bearer"
+                }
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+    finally:
+        cursor.close()
+        conn.close()
+
 
 
 # Documentacion ip.server/docs (swagger)

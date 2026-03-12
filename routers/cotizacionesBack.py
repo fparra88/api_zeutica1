@@ -8,7 +8,7 @@ import os
 from dotenv import load_dotenv
 from typing import Optional
 
-router =APIRouter(prefix="/zeutica",tags=["/cotizaciones"],responses={404: {"Mensaje":"No encontrado"}})
+router =APIRouter(tags=["/cotizaciones"],responses={404: {"Mensaje":"No encontrado"}})
 load_dotenv() # Cargar credenciales .env
 
 # Configuración de la conexión
