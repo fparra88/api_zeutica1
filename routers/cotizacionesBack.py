@@ -50,6 +50,8 @@ class CotizacionSchema(BaseModel):
 class VinculoFactura(BaseModel):
     codigo_cotizacion: str  
     relacion_factura: Optional[str] = None
+    metodo_pago: Optional[str] = None
+    fecha_pago: Optional[str] = None
 
 @router.get("/cotizaciones/nuevo-codigo")
 async def obtener_nuevo_codigo():
@@ -163,10 +165,9 @@ async def vincular_factura(vinculos: List[VinculoFactura]):
         with connection.cursor() as cursor:
             # Recorremos cada cotización modificada que llegó desde Streamlit
             for v in vinculos:
-                # Actualizamos el registro. 
-                # IMPORTANTE: Revisa si tu tabla se llama 'cotizaciones' y si la llave primaria es 'codigo'
-                sql = "UPDATE cotizaciones SET relacion_factura = %s WHERE codigo_cotizacion = %s"
-                cursor.execute(sql, (v.relacion_factura, v.codigo_cotizacion))
+                # Actualizamos el registro.                 
+                sql = "UPDATE cotizaciones SET relacion_factura = %s, metodo_pago = %s, fecha_pago = %s WHERE codigo_cotizacion = %s"
+                cursor.execute(sql, (v.relacion_factura, v.metodo_pago, v.fecha_pago, v.codigo_cotizacion))
             
             # Guardamos los cambios
             connection.commit()

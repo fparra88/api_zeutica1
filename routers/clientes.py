@@ -31,6 +31,7 @@ class clienteRfc(Cliente): # molde con herencia para cliente factura
     cp: Optional[int] = None
     regimen: Optional[str] = None
     usocdfi: Optional[str] = None
+    usuario: str
 
 class clienteEditar(clienteRfc): # molde para editar cliente con id
     id: int
@@ -66,12 +67,12 @@ async def cliente_nuevo(cliente: clienteRfc):
 
     # El Query de inserción
     query = """
-        INSERT INTO clientes (nombre, email, empresa, contacto, telefono, direccion, rfc, cp, regimen, usocfdi) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO clientes (nombre, email, empresa, contacto, telefono, direccion, rfc, cp, regimen, usocfdi, usuario) 
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
 
     # Extraemos los valores del objeto cliente
-    valores = (cliente.nombre, cliente.email, cliente.empresa, cliente.contacto, cliente.telefono, cliente.direccion, cliente.rfc, cliente.cp, cliente.regimen, cliente.usocdfi)
+    valores = (cliente.nombre, cliente.email, cliente.empresa, cliente.contacto, cliente.telefono, cliente.direccion, cliente.rfc, cliente.cp, cliente.regimen, cliente.usocdfi, cliente.usuario)
 
     try:
         cursor.execute(query, valores)
