@@ -43,6 +43,7 @@ class CotizacionSchema(BaseModel):
     costo_envio: float  # Cambié de int a float para aceptar decimales
     forma_pago: str
     comentarios: str
+    usuario: str
     items: List[ItemCotizacion]
 
 # Creamos el "molde" para los datos que enviará Streamlit
@@ -85,14 +86,14 @@ async def guardar_cotizacion(cot: CotizacionSchema):
             # 1. Insertar en la tabla principal (Maestro)
             sql_maestro = """
                 INSERT INTO cotizaciones 
-                (codigo_cotizacion, empresa, atencion, email, domicilio, telefono, subtotal, iva, total, costo_envio, forma_pago, comentarios) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (codigo_cotizacion, empresa, atencion, email, domicilio, telefono, subtotal, iva, total, costo_envio, forma_pago, comentarios, usuario) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             # Convierto valores monetarios a float para evitar problemas de tipo
             valores_maestro = (
                 cot.codigo_cotizacion, cot.empresa, cot.atencion, cot.email, 
                 cot.domicilio, cot.telefono, float(cot.subtotal), float(cot.iva), 
-                float(cot.total), float(cot.costo_envio), cot.forma_pago, cot.comentarios
+                float(cot.total), float(cot.costo_envio), cot.forma_pago, cot.comentarios, cot.usuario
             )
             cursor.execute(sql_maestro, valores_maestro)
             
