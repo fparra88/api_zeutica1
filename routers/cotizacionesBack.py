@@ -44,6 +44,7 @@ class CotizacionSchema(BaseModel):
     forma_pago: str
     comentarios: str
     usuario: str
+    pdf: str
     items: List[ItemCotizacion]
 
 # Creamos el "molde" para los datos que enviará Streamlit
@@ -85,24 +86,24 @@ async def guardar_cotizacion(cot: CotizacionSchema):
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-            # 1. Insertar en la tabla principal (Maestro)
+            # Insertar en la tabla principal (Maestro)
             sql_maestro = """
                 INSERT INTO cotizaciones 
-                (codigo_cotizacion, empresa, atencion, email, domicilio, telefono, subtotal, iva, total, costo_envio, forma_pago, comentarios, usuario) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (codigo_cotizacion, empresa, atencion, email, domicilio, telefono, subtotal, iva, total, costo_envio, forma_pago, comentarios, usuario, pdf) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             # Convierto valores monetarios a float para evitar problemas de tipo
             valores_maestro = (
                 cot.codigo_cotizacion, cot.empresa, cot.atencion, cot.email, 
                 cot.domicilio, cot.telefono, float(cot.subtotal), float(cot.iva), 
-                float(cot.total), float(cot.costo_envio), cot.forma_pago, cot.comentarios, cot.usuario
+                float(cot.total), float(cot.costo_envio), cot.forma_pago, cot.comentarios, cot.usuario, cot.pdf
             )
             cursor.execute(sql_maestro, valores_maestro)
             
             # Obtenemos el ID generado para vincular los productos
             cotizacion_id = cursor.lastrowid
             
-            # 2. Insertar los productos (Detalle)
+            # Insertar los productos
             sql_detalle = """
                 INSERT INTO cotizacion_items 
                 (cotizacion_id, sku, nombre_producto, cantidad, precio_unitario, total_linea) 
