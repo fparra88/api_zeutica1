@@ -1,2 +1,5 @@
 .env
-AGENTS.MD
+CLAUDE.MD
+*.tmp*
+__pycache__/
+*.pyc

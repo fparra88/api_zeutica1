@@ -76,14 +76,16 @@ async def obtener_pedidos():
 class EfirmaModel(BaseModel):
     numero_orden: str
     firma_base64: str
+    fecha_firma: str
+    usuario: str
 
 @router.post("/efirma")
 async def efirma(payload: EfirmaModel):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        query = "UPDATE cleanestChoice SET firma_digital = %s WHERE numero_orden = %s"
-        cursor.execute(query, (payload.firma_base64, payload.numero_orden))
+        query = "UPDATE cleanestChoice SET firma_digital = %s, fecha_firma = %s, usuario = %s WHERE numero_orden = %s"
+        cursor.execute(query, (payload.firma_base64,  payload.fecha_firma, payload.usuario, payload.numero_orden))
         conn.commit()
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Ticket no encontrado")
@@ -95,6 +97,36 @@ async def efirma(payload: EfirmaModel):
         if conn.is_connected():
             cursor.close()
             conn.close()
+
+@router.get("/obtener-firma")
+async def obtener_firma(numero_orden: str):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Busco la firma de esa orden puntual
+        cursor.execute(
+            "SELECT firma_digital, fecha_firma FROM cleanestChoice WHERE numero_orden = %s",
+            (numero_orden,)
+        )
+        res = cursor.fetchone()
+
+        if not res:
+            raise HTTPException(status_code=404, detail="Orden no encontrada")
+
+        # Si no tiene firma todavía, lo digo claro
+        if res["firma_digital"] is None:
+            raise HTTPException(status_code=404, detail="La orden no tiene firma registrada")
+
+        return {"numero_orden": numero_orden, "firma_digital": res["firma_digital"], "fecha_firma":res["fecha_firma"]}
+
+    except mysql.connector.Error as err:
+        print(f"Error en BD: {err}")
+        raise HTTPException(status_code=500, detail="Error al obtener la firma")
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
+
 
 class OrdenUpdateModel(BaseModel):
     numero_orden: Optional[str] = None

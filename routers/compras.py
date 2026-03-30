@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from typing import List
 import os
 import mysql.connector
 
@@ -18,66 +19,74 @@ class compraPromedio(BaseModel):
     sku: str     
     costo_prom: float
 
-# Modelo para recibir datos de compra
+# Modelo para cada ítem de la lista de compra
 class CompraModel(BaseModel):
-    sku: str  # Identificador del producto
+    sku: str
     nombre: str
-    stock_bodega: int
-    costo_total: float
+    stock_bodega: int       # qty del frontend
+    costo_total: float      # costo_unit del frontend
+    num_factura: str
+    proveedor: str
+    descuento_pct: float
+    iva_pct: float
+    subtotal: float
     usuario: str
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "sku": "PROD001",
-                "nombre": "Display LED 32 pulgadas",
-                "stock_bodega": 10,
-                "costo_total": 5500.50,
-                "usuario": "ventas"
-            }
-        }
-
 @router.post("/compras")
-async def recibir_compra(compra: CompraModel):    
+async def recibir_compra(compras: List[CompraModel]):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    res_items = []
+
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        for compra in compras:
+            # Verifico si el producto existe antes de moverle el stock
+            cursor.execute(
+                "SELECT stock_bodega FROM productos WHERE sku = %s",
+                (compra.sku,)
+            )
+            res_existe = cursor.fetchone()
 
-        # Busco si el producto ya existe por SKU
-        cursor.execute(
-            "SELECT stock_bodega FROM productos WHERE sku = %s",
-            (compra.sku,)
-        )
-        res_existe = cursor.fetchone()
+            if not res_existe:
+                # Si el SKU no existe, lo anoto y sigo con los demás
+                res_items.append({"sku": compra.sku, "msg": "SKU no encontrado, se omitió"})
+                continue
 
-        if res_existe:
-            # Si existe, sumo el stock que me llega con lo que hay en BD
             stock_actual = res_existe[0]
             stock_nuevo = stock_actual + compra.stock_bodega
 
+            # Actualizo stock y costo en productos
             cursor.execute(
                 "UPDATE productos SET stock_bodega = %s, costo_total = %s WHERE sku = %s",
                 (stock_nuevo, compra.costo_total, compra.sku)
             )
 
-            sql_insert = "INSERT INTO compras (sku, nombre, stock_bodega, costo_total, usuario) VALUES (%s, %s, %s, %s, %s)"
-            valores = (compra.sku, compra.nombre, compra.stock_bodega, compra.costo_total, compra.usuario)
+            # Registro el movimiento en la tabla de compras
+            sql_insert = """
+                INSERT INTO compras
+                (sku, nombre, stock_bodega, costo_total, num_factura, proveedor, descuento_pct, iva_pct, subtotal, usuario)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            valores = (
+                compra.sku, compra.nombre, compra.stock_bodega, compra.costo_total,
+                compra.num_factura, compra.proveedor, compra.descuento_pct,
+                compra.iva_pct, compra.subtotal, compra.usuario
+            )
             cursor.execute(sql_insert, valores)
-            
-            conn.commit()
-            return {
-                "msg": "Compra actualizada",
+
+            res_items.append({
                 "sku": compra.sku,
+                "msg": "OK",
                 "stock_anterior": stock_actual,
                 "stock_nuevo": stock_nuevo
-            }
-        else:
-            return {
-                "mensaje": "El producto no existe revisa el SKU"
-            }
+            })
+
+        conn.commit()
+        return {"msg": "Compra procesada", "items": res_items}
 
     except mysql.connector.Error as err:
-        # Si la base de datos truena, me entero qué pasó
+        # Si la base de datos truena, hago rollback y me entero qué pasó
+        conn.rollback()
         print(f"Error en BD: {err}")
         raise HTTPException(status_code=500, detail="Error al procesar la compra en BD")
 
