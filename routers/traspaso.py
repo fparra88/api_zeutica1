@@ -91,3 +91,47 @@ async def consulta_traspasos():
     finally:
         cursor.close()
         connection.close()
+
+@router.post("/traspaso/clean")
+async def traspaso_multiple(lote: LoteTraspaso):
+    connection = get_db_connection()
+    cursor = connection.cursor(dictionary=True)
+    
+    try:
+        # Iniciamos el proceso para todos los items
+        for item in lote.movimientos:
+            # A. Verificar stock
+            cursor.execute("SELECT stock_bodega FROM productos WHERE sku = %s", (item.sku,))
+            res = cursor.fetchone()
+            
+            if not res or res['stock_bodega'] < item.stock_bodega:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Error en SKU {item.sku}: Stock insuficiente o no existe."
+                )
+
+            # B. Resta de bodega y suma a clean — COALESCE por si clean trae NULL
+            sql_update = """
+                UPDATE productos
+                SET stock_bodega = stock_bodega - %s,
+                    stock_clean = COALESCE(stock_clean, 0) + %s
+                WHERE sku = %s
+            """
+            cursor.execute(sql_update, (item.stock_bodega, item.stock_bodega, item.sku))
+
+            # C. Historial
+            cursor.execute(
+                "INSERT INTO stock_actual (sku, cantidad, usuario) VALUES (%s, %s, %s)",
+                (item.sku, item.stock_bodega, lote.usuario)
+            )
+
+        # D. Si TODO salió bien, guardamos cambios en MySQL
+        connection.commit()
+        return {"status": "success", "mensaje": f"{len(lote.movimientos)} movimientos procesados"}
+
+    except Exception as e:
+        connection.rollback() # Si uno falla, ninguno se guarda (mantiene integridad)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
+        connection.close()

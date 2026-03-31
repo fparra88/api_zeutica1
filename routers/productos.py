@@ -182,56 +182,22 @@ async def actualizar_productos(datos: ProdEditSchema):
                     continue
                 
                 # Construyo la consulta dinámicamente según qué campos vinieron
+                columnas_protegidas = ["id", "sku", "in_full", "stock_total"]
                 campos_actualizar = []
                 valores = []
                 
-                if "stock_bodega" in prod:
-                    campos_actualizar.append("stock_bodega = %s")
-                    valores.append(prod["stock_bodega"])
-                
-                if "stock_full" in prod:
-                    campos_actualizar.append("stock_full = %s")
-                    valores.append(prod["stock_full"])
-                
-                if "stock_fba" in prod:
-                    campos_actualizar.append("stock_fba = %s")
-                    valores.append(prod["stock_fba"])
-
-                if "costo_total" in prod:
-                    campos_actualizar.append("costo_total = %s")
-                    valores.append(prod["costo_total"])
-                
-                if "precio" in prod:
-                    campos_actualizar.append("precio = %s")
-                    valores.append(prod["precio"])
-                
-                if "precio_2" in prod:
-                    campos_actualizar.append("precio_2 = %s")
-                    valores.append(prod["precio_2"])
-                
-                if "precio_3" in prod:
-                    campos_actualizar.append("precio_3 = %s")
-                    valores.append(prod["precio_3"])
-
-                if "precio_amazon" in prod:
-                    campos_actualizar.append("precio_amazon = %s")
-                    valores.append(prod["precio_amazon"])
-
-                if "precio_clean" in prod:
-                    campos_actualizar.append("precio_clean = %s")
-                    valores.append(prod["precio_clean"])
+                for columna, valor in prod.items():
+                    # Solo agregamos si la columna no está en la lista negra
+                    if columna not in columnas_protegidas:
+                        campos_actualizar.append(f"{columna} = %s")
+                        valores.append(valor)
                 
                 # Si no hay campos para actualizar, lo salto
-                if not campos_actualizar:
-                    res_errores.append({
-                        "problema": "No hay campos para actualizar",
-                        "producto": prod
-                    })
-                    continue
+                if campos_actualizar:                   
                 
-                # Armo el UPDATE SQL con los campos dinámicos
-                sql_update = f"UPDATE productos SET {', '.join(campos_actualizar)} WHERE sku = %s"
-                valores.append(prod["sku"])
+                    # Armo el UPDATE SQL con los campos dinámicos
+                    sql_update = f"UPDATE productos SET {', '.join(campos_actualizar)} WHERE sku = %s"
+                    valores.append(prod.get("sku"))
                 
                 cursor.execute(sql_update, valores)
                 
