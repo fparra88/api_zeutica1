@@ -183,6 +183,36 @@ async def vincular_factura(vinculos: List[VinculoFactura]):
         connection.close()
 
 
+class FirmaEnvio(BaseModel):
+    codigo_cotizacion: str
+    firma_base64: str
+    usuario: str
+    fecha_firma: str
+
+@router.post("/firma-ventas")
+async def guardar_firma(firma: FirmaEnvio):
+    connection = get_db_connection()
+    try:
+        with connection.cursor() as cursor:
+            # Inyecto la firma en la cotización que me piden, nada más
+            sql = "UPDATE cotizaciones SET firma_envio = %s WHERE codigo_cotizacion = %s"
+            cursor.execute(sql, (firma.firma_base64, firma.codigo_cotizacion))
+
+            if cursor.rowcount == 0:
+                # Si no encontró la cotización, aviso antes de hacer commit
+                raise HTTPException(status_code=404, detail=f"Cotización {firma.codigo_cotizacion} no encontrada")
+
+            connection.commit()
+            return {"status": "success", "mensaje": f"Firma guardada en {firma.codigo_cotizacion}"}
+
+    except mysql.connector.Error as err:
+        connection.rollback()
+        print(f"Error BD al guardar firma: {err}")
+        raise HTTPException(status_code=500, detail=f"Error BD: {str(err)}")
+    finally:
+        connection.close()
+
+
 @router.get("/cotizacion/{cotizacion_id}") # Endpoint para items de cotizacion
 async def obtener_items_cotizacion(cotizacion_id: int):
     connection = get_db_connection()

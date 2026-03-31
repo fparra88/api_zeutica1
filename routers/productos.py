@@ -208,6 +208,14 @@ async def actualizar_productos(datos: ProdEditSchema):
                 if "precio_3" in prod:
                     campos_actualizar.append("precio_3 = %s")
                     valores.append(prod["precio_3"])
+
+                if "precio_amazon" in prod:
+                    campos_actualizar.append("precio_amazon = %s")
+                    valores.append(prod["precio_amazon"])
+
+                if "precio_clean" in prod:
+                    campos_actualizar.append("precio_clean = %s")
+                    valores.append(prod["precio_clean"])
                 
                 # Si no hay campos para actualizar, lo salto
                 if not campos_actualizar:
