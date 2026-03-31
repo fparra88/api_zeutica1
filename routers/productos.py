@@ -196,6 +196,10 @@ async def actualizar_productos(datos: ProdEditSchema):
                 if "stock_fba" in prod:
                     campos_actualizar.append("stock_fba = %s")
                     valores.append(prod["stock_fba"])
+
+                if "costo_total" in prod:
+                    campos_actualizar.append("costo_total = %s")
+                    valores.append(prod["costo_total"])
                 
                 if "precio" in prod:
                     campos_actualizar.append("precio = %s")
