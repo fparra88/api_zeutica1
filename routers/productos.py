@@ -56,7 +56,7 @@ async def consultar_inventario_completo():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True) # Usamos dictionary=True para que devuelva claves como 'sku'
     
-    query = "SELECT sku, nombre, categoria, medida, ubicacion, stock_minimo, stock_bodega, stock_full, stock_fba, stock_total, numero_referencia, costo_total, precio, precio_2, precio_3, precio_amazon, precio_clean FROM productos"
+    query = "SELECT sku, nombre, categoria, medida, ubicacion, stock_minimo, stock_bodega, stock_full, stock_fba, stock_clean, stock_total, numero_referencia, costo_total, precio, precio_2, precio_3, precio_amazon, precio_clean FROM productos"
     
     try:
         cursor.execute(query) 
@@ -80,7 +80,7 @@ async def obtener_producto_por_sku(sku: str):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)  
     # Usamos %s para prevenir inyección SQL
-    query = "SELECT id, sku, nombre, stock_bodega, stock_full, stock_fba, stock_total, precio, precio_2, precio_3 FROM productos WHERE sku = %s"
+    query = "SELECT id, sku, nombre, stock_bodega, stock_full, stock_fba, stock_clean, stock_total, precio, precio_2, precio_3 FROM productos WHERE sku = %s"
     try:
         cursor.execute(query, (sku,))    
         resultado = cursor.fetchone()
@@ -96,6 +96,7 @@ async def obtener_producto_por_sku(sku: str):
             "stock_bodega": resultado['stock_bodega'],
             "stock_full": resultado['stock_full'],
             "stock_fba": resultado['stock_fba'],
+            "stock_clean":resultado['stock_clean'],
             "stock_total": resultado['stock_total'],
             "precio": resultado['precio'],
             "precio_2": resultado['precio_2'],
