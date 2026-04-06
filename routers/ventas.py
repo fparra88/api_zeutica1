@@ -38,3 +38,25 @@ async def consultar_ventas(f1: str, f2: str):
         cursor.close()
         conn.close()
         
+@router.get("/verifica-venta/{norden}") # Enpoint para Cleanest Choice verifica si existe venta 
+async def verificar_venta(norden: int):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    query = "SELECT id FROM ventasRegistro WHERE id_ventas = %s"
+
+    try:
+        cursor.execute(query,(norden,))
+        existe = cursor.fetchone()
+
+        if not existe:
+            raise HTTPException(status_code=404, detail="El registro de venta no existe")
+        
+        return existe
+    
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+    
+    finally:
+        cursor.close()
+        conn.close()
