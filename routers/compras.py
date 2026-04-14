@@ -161,3 +161,32 @@ async def costo_promedio(cprom: compraPromedio):
         if conn.is_connected():
             cursor.close()
             conn.close()
+
+@router.get("/registro-compras")
+async def obtener_compras():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        # Buscamos las compras
+        query = """
+            SELECT id, sku, nombre, stock_bodega, costo_total, num_factura, proveedor, (subtotal*(1+(iva_pct/100))) AS total
+            FROM compras                    
+            
+        """
+        cursor.execute(query)
+        resultados = cursor.fetchall()
+
+        if not resultados:
+                raise HTTPException(status_code=404, detail="No se encontraron compras")
+        
+        return resultados
+    
+    except Exception as e:
+        # Esto imprimirá el error REAL en tu consola de AWS para que sepas qué pasó
+        print(f"Error detectado: {e}") 
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+    finally:
+        conn.close()
+        cursor.close()
