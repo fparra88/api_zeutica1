@@ -236,3 +236,30 @@ async def obtener_items_cotizacion(cotizacion_id: int):
         )
     finally:
         connection.close()
+
+class vendido(BaseModel):
+    vendido: int
+    codigo_cotizacion: str
+
+@router.post("/cotizaciones/vendido")
+async def guardar_cotizacion(vendido: vendido):
+    connection = get_db_connection()
+    try:
+        with connection.cursor() as cursor:
+            # Insertar en la tabla principal (Maestro)
+            sql_maestro = """
+              UPDATE cotizaciones SET vendido = %s WHERE codigo_cotizacion = %s
+            """
+
+            cursor.execute(sql_maestro, (vendido.vendido, vendido.codigo_cotizacion))      
+                                 
+            connection.commit()
+            return {"status": "success"}            
+   
+    except Exception as e:
+        connection.rollback()
+        print(f"Error inesperado: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    finally:
+        connection.close()
