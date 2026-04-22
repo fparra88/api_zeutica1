@@ -60,3 +60,26 @@ async def verificar_venta(norden: int):
     finally:
         cursor.close()
         conn.close()
+
+@router.get("/ventas-credito") # Enpoint para mostrar clientes a credito
+async def verificar_venta():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    query = "SELECT id_ventas, sku, producto, cantidad, nombreComprador, saldo_pendiente FROM ventasRegistro WHERE saldo_pendiente > 0 "
+
+    try:
+        cursor.execute(query)
+        existe = cursor.fetchall()
+
+        if not existe:
+            raise HTTPException(status_code=404, detail="El registro de venta no existe")
+        
+        return existe
+    
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+    
+    finally:
+        cursor.close()
+        conn.close()

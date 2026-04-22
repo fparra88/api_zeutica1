@@ -30,6 +30,7 @@ class VentaSchema(BaseModel):
     otros: str
     plataforma: str
     usuario: str
+    condicion_pago: str
 
 class ProdEditSchema(BaseModel):
     """Modelo para recibir productos editados desde el frontend"""
@@ -117,7 +118,7 @@ async def registrar_venta(venta: VentaSchema):
     try:
         with connection.cursor(dictionary=True) as cursor:
             
-            # A. Verificar stock
+            # A. Verificar stock (Se mantiene igual)
             sql_check = "SELECT stock_bodega FROM productos WHERE sku = %s"
             cursor.execute(sql_check, (venta.sku,))
             resultado = cursor.fetchone()
@@ -128,13 +129,37 @@ async def registrar_venta(venta: VentaSchema):
             if resultado['stock_bodega'] < venta.stock_bodega:
                 raise HTTPException(status_code=400, detail=f"Stock insuficiente. Solo hay {resultado['stock_bodega']}")
         
-            # B. Aplicar el descuento al inventario
+            # B. Aplicar el descuento al inventario (Se mantiene igual)
             sql_restar = "UPDATE productos SET stock_bodega = stock_bodega - %s WHERE sku = %s" 
             cursor.execute(sql_restar, (venta.stock_bodega, venta.sku))
 
-            # C. Registrar venta en el historial            
-            sql_insert = "INSERT INTO ventasRegistro (id_ventas, sku, producto, cantidad, precio, fecha, nombreComprador, otros, plataforma, usuario) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
-            valores = (venta.id_venta, venta.sku, venta.producto, venta.stock_bodega, venta.precio, venta.fecha, venta.nombreComprador, venta.otros, venta.plataforma, venta.usuario)
+            # --- NUEVA LÓGICA DE CRÉDITO ---
+            # Calculamos el saldo inicial. Si es CRÉDITO, el saldo es el total (precio * cantidad)
+            # Si es CONTADO, el saldo es 0.
+            total_operacion = venta.precio * venta.stock_bodega
+            saldo_inicial = total_operacion if venta.condicion_pago == "CREDITO" else 0.00
+
+            # C. Registrar venta en el historial (Actualizado con nuevas columnas)            
+            sql_insert = """
+                INSERT INTO ventasRegistro 
+                (id_ventas, sku, producto, cantidad, precio, fecha, nombreComprador, otros, plataforma, usuario, condicion_pago, saldo_pendiente) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            valores = (
+                venta.id_venta, 
+                venta.sku, 
+                venta.producto, 
+                venta.stock_bodega, 
+                venta.precio, 
+                venta.fecha, 
+                venta.nombreComprador, 
+                venta.otros, 
+                venta.plataforma, 
+                venta.usuario,
+                venta.condicion_pago, # Nuevo campo
+                saldo_inicial         # Nuevo campo calculado
+            )
             cursor.execute(sql_insert, valores)
 
             # D. Confirmar cambios
@@ -143,12 +168,13 @@ async def registrar_venta(venta: VentaSchema):
             return {
                 "message": "Venta aplicada exitosamente", 
                 "sku": venta.sku, 
-                "nuevo_stock": resultado['stock_bodega'] - venta.stock_bodega
+                "nuevo_stock": resultado['stock_bodega'] - venta.stock_bodega,
+                "saldo_pendiente": saldo_inicial
             }
 
     except mysql.connector.Error as err:
         connection.rollback()
-        print(f"Error SQL: {err}") # Imprimir en consola para depurar
+        print(f"Error SQL: {err}")
         raise HTTPException(status_code=500, detail=f"Error en base de datos: {err}")
     
     finally:

@@ -36,6 +36,8 @@ class clienteRfc(Cliente): # molde con herencia para cliente factura
 
 class clienteEditar(clienteRfc): # molde para editar cliente con id
     id: int
+    frecuencia: str
+    credito: bool
     
 @router.get("/clientes") #Endpoint para consultar clientes en base de datos
 async def obtener_clientes():
@@ -98,13 +100,13 @@ async def edit_cliente(cliente: clienteEditar):
     query = """
         UPDATE clientes 
         SET nombre = %s, email = %s, empresa = %s, contacto = %s, telefono = %s, 
-            direccion = %s, rfc = %s, cp = %s, regimen = %s, usocfdi = %s
+            direccion = %s, rfc = %s, cp = %s, regimen = %s, usocfdi = %s, frecuencia = %s, credito = %s
         WHERE id = %s
     """
 
     # Extraemos los valores del objeto cliente (el id va al final)
     valores = (cliente.nombre, cliente.email, cliente.empresa, cliente.contacto, cliente.telefono, 
-               cliente.direccion, cliente.rfc, cliente.cp, cliente.regimen, cliente.usocdfi, cliente.id)
+               cliente.direccion, cliente.rfc, cliente.cp, cliente.regimen, cliente.usocdfi, cliente.frecuencia, cliente.credito, cliente.id)
 
     try:
         cursor.execute(query, valores)
