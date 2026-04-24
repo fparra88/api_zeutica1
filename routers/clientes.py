@@ -33,11 +33,14 @@ class clienteRfc(Cliente): # molde con herencia para cliente factura
     usocdfi: Optional[str] = None
     frecuencia: Optional[str] = None
     usuario: str
+    credito: bool
+    monto_credito: Optional[int] = None
+    
 
 class clienteEditar(clienteRfc): # molde para editar cliente con id
     id: int
     frecuencia: str
-    credito: bool
+    
     
 @router.get("/clientes") #Endpoint para consultar clientes en base de datos
 async def obtener_clientes():
@@ -70,12 +73,12 @@ async def cliente_nuevo(cliente: clienteRfc):
 
     # El Query de inserción
     query = """
-        INSERT INTO clientes (nombre, email, empresa, contacto, telefono, direccion, rfc, cp, regimen, usocfdi, frecuencia, usuario) 
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO clientes (nombre, email, empresa, contacto, telefono, direccion, rfc, cp, regimen, usocfdi, frecuencia, usuario, credito, monto_credito) 
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
 
     # Extraemos los valores del objeto cliente
-    valores = (cliente.nombre, cliente.email, cliente.empresa, cliente.contacto, cliente.telefono, cliente.direccion, cliente.rfc, cliente.cp, cliente.regimen, cliente.usocdfi, cliente.frecuencia, cliente.usuario)
+    valores = (cliente.nombre, cliente.email, cliente.empresa, cliente.contacto, cliente.telefono, cliente.direccion, cliente.rfc, cliente.cp, cliente.regimen, cliente.usocdfi, cliente.frecuencia, cliente.usuario, cliente.credito, cliente.monto_credito)
 
     try:
         cursor.execute(query, valores)
@@ -100,13 +103,13 @@ async def edit_cliente(cliente: clienteEditar):
     query = """
         UPDATE clientes 
         SET nombre = %s, email = %s, empresa = %s, contacto = %s, telefono = %s, 
-            direccion = %s, rfc = %s, cp = %s, regimen = %s, usocfdi = %s, frecuencia = %s, credito = %s
+            direccion = %s, rfc = %s, cp = %s, regimen = %s, usocfdi = %s, frecuencia = %s, credito = %s, monto_credito = %s
         WHERE id = %s
     """
 
     # Extraemos los valores del objeto cliente (el id va al final)
     valores = (cliente.nombre, cliente.email, cliente.empresa, cliente.contacto, cliente.telefono, 
-               cliente.direccion, cliente.rfc, cliente.cp, cliente.regimen, cliente.usocdfi, cliente.frecuencia, cliente.credito, cliente.id)
+               cliente.direccion, cliente.rfc, cliente.cp, cliente.regimen, cliente.usocdfi, cliente.frecuencia, cliente.credito, cliente.monto_credito, cliente.id)
 
     try:
         cursor.execute(query, valores)
