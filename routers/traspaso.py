@@ -24,6 +24,7 @@ class traspaso(BaseModel): # molde para recibir informacion de traspaso
 class LoteTraspaso(BaseModel):
     usuario: str
     movimientos: List[traspaso]
+    almacen: str
 
 @router.post("/traspaso")
 async def traspaso_multiple(lote: LoteTraspaso):
@@ -54,8 +55,8 @@ async def traspaso_multiple(lote: LoteTraspaso):
 
             # C. Historial
             cursor.execute(
-                "INSERT INTO stock_actual (sku, cantidad, usuario) VALUES (%s, %s, %s)",
-                (item.sku, item.stock_bodega, lote.usuario)
+                "INSERT INTO stock_actual (sku, cantidad, almacen, usuario) VALUES (%s, %s, %s, %s)",
+                (item.sku, item.stock_bodega,lote.almacen, lote.usuario)
             )
 
         # D. Si TODO salió bien, guardamos cambios en MySQL
@@ -74,7 +75,7 @@ async def consulta_traspasos():
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-    sql = ("SELECT sku, cantidad, fecha_registro FROM stock_actual")
+    sql = ("SELECT sku, cantidad, almacen, fecha_registro FROM stock_actual")
 
     try:
         cursor.execute(sql)
@@ -121,8 +122,8 @@ async def traspaso_multiple(lote: LoteTraspaso):
 
             # C. Historial
             cursor.execute(
-                "INSERT INTO stock_actual (sku, cantidad, usuario) VALUES (%s, %s, %s)",
-                (item.sku, item.stock_bodega, lote.usuario)
+                "INSERT INTO stock_actual (sku, cantidad, almacen, usuario) VALUES (%s, %s, %s, %s)",
+                (item.sku, item.stock_bodega, lote.almacen, lote.usuario)
             )
 
         # D. Si TODO salió bien, guardamos cambios en MySQL
