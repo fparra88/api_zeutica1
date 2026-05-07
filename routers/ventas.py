@@ -39,7 +39,7 @@ async def consultar_ventas(f1: str, f2: str):
         conn.close()
         
 @router.get("/verifica-venta/{norden}") # Enpoint para Cleanest Choice verifica si existe venta 
-async def verificar_venta(norden: int):
+async def verificar_venta(norden: str):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 

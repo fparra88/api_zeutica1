@@ -28,11 +28,13 @@ class ConteoPayload(BaseModel):
 
 @router.post("/inventario/conteo")
 async def registrar_conteo(payload: ConteoPayload):
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    conn = None
     res_items = []
 
     try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
         for item in payload.productos:
             # Verifico que el SKU exista antes de registrar
             cursor.execute("SELECT sku FROM productos WHERE sku = %s", (item.sku,))
@@ -43,8 +45,8 @@ async def registrar_conteo(payload: ConteoPayload):
                 continue
 
             cursor.execute(
-                "INSERT INTO conteo_inventario (sku, conteo, usuario) VALUES (%s, %s, %s)",
-                (item.sku, item.conteo, payload.usuario)
+                "UPDATE productos SET conteo = %s, usuario = %s WHERE sku = %s",
+                (item.conteo, payload.usuario, item.sku)
             )
             res_items.append({"sku": item.sku, "msg": "OK"})
 
@@ -52,11 +54,12 @@ async def registrar_conteo(payload: ConteoPayload):
         return {"mensaje": "Conteo registrado exitosamente", "items": res_items}
 
     except mysql.connector.Error as err:
-        conn.rollback()
+        if conn:
+            conn.rollback()
         print(f"Error en BD: {err}")
         raise HTTPException(status_code=500, detail="Error al registrar conteo en BD")
 
     finally:
-        if conn.is_connected():
+        if conn and conn.is_connected():
             cursor.close()
             conn.close()

@@ -160,3 +160,80 @@ async def actualizar_pedido(pedido_id: int, payload: OrdenUpdateModel):
         if conn.is_connected():
             cursor.close()
             conn.close()
+
+
+# Definimos un modelo para recibir los datos en JSON (Body)
+class VentaSchema(BaseModel):
+    id_venta: int
+    sku: str
+    producto: str
+    stock_clean: int
+    precio: float
+    fecha: str
+    nombreComprador: str
+    otros: str
+    plataforma: str
+    usuario: str
+    condicion_pago: str
+
+@router.post("/cleanest/venta")
+async def eliminar_pedido(venta: VentaSchema):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Traigo el stock actual antes de modificarlo
+        cursor.execute("SELECT stock_clean FROM productos WHERE sku = %s", (venta.sku,))
+        res_existe = cursor.fetchone()
+
+        if not res_existe:
+            raise HTTPException(status_code=404, detail="sku no encontrado")
+
+        # Si stock_clean es NULL en BD, lo trato como 0
+        stock_actual = res_existe[0] if res_existe[0] is not None else 0
+
+        if stock_actual < venta.stock_clean:
+            raise HTTPException(status_code=400, detail=f"Stock insuficiente. Disponible: {stock_actual}")
+
+        cursor.execute("UPDATE productos SET stock_clean = stock_clean - %s WHERE sku = %s", (venta.stock_clean, venta.sku))
+        saldo_inicial = 0
+
+        sql_insert = """
+            INSERT INTO ventasregistro
+            (id_ventas, sku, producto, cantidad, precio, fecha, nombreComprador, otros, plataforma, usuario, condicion_pago, saldo_pendiente)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """
+
+        valores = (
+            venta.id_venta,
+            venta.sku,
+            venta.producto,
+            venta.stock_clean,
+            venta.precio,
+            venta.fecha,
+            venta.nombreComprador,
+            venta.otros,
+            venta.plataforma,
+            venta.usuario,
+            venta.condicion_pago,
+            saldo_inicial
+        )
+        cursor.execute(sql_insert, valores)
+
+        conn.commit()
+
+        return {
+            "message": "Venta aplicada exitosamente",
+            "sku": venta.sku,
+            "nuevo_stock": stock_actual - venta.stock_clean,
+            "saldo_pendiente": saldo_inicial
+        }
+        
+    except mysql.connector.Error as err:
+
+        print(f"Error en BD: {err}")
+        raise HTTPException(status_code=500, detail="Error al descontar stock")
+    
+    finally:
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
