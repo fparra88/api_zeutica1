@@ -164,7 +164,7 @@ async def actualizar_pedido(pedido_id: int, payload: OrdenUpdateModel):
 
 # Definimos un modelo para recibir los datos en JSON (Body)
 class VentaSchema(BaseModel):
-    id_venta: int
+    id_venta: str
     sku: str
     producto: str
     stock_clean: int
@@ -192,19 +192,18 @@ async def ingresar_venta(venta: VentaSchema):
         stock_actual = res_existe["stock_clean"] if res_existe["stock_clean"] is not None else 0
 
         if stock_actual < venta.stock_clean:
-            raise HTTPException(status_code=400, detail=f"Stock insuficiente. Disponible: {stock_actual}")
+            raise HTTPException(status_code=400, detail=f"Sku: {venta.sku} Stock insuficiente. Disponible: {stock_actual}")
 
         cursor.execute("UPDATE productos SET stock_clean = stock_clean - %s WHERE sku = %s", (venta.stock_clean, venta.sku))
-        saldo_pendiente = 0
 
         sql_insert = """
-            INSERT IGNORE INTO ventasRegistro
+            INSERT INTO ventasRegistro
             (id_ventas, sku, producto, cantidad, precio, fecha, nombreComprador, otros, plataforma, usuario, condicion_pago, saldo_pendiente)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
 
         valores = (
-            venta.id_venta, 
+            venta.id_venta,
             venta.sku,
             venta.producto,
             venta.stock_clean,
@@ -215,9 +214,14 @@ async def ingresar_venta(venta: VentaSchema):
             venta.plataforma,
             venta.usuario,
             venta.condicion_pago,
-            saldo_pendiente
+            0
         )
         cursor.execute(sql_insert, valores)
+
+        # Si insert no insertó nada, revierto el descuento de stock
+        if cursor.rowcount == 0:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail="No se registró la venta")
 
         conn.commit()
 
@@ -225,11 +229,11 @@ async def ingresar_venta(venta: VentaSchema):
             "message": "Venta aplicada exitosamente",
             "sku": venta.sku,
             "nuevo_stock": stock_actual - venta.stock_clean,
-            "saldo_pendiente": saldo_pendiente
+            "saldo_pendiente": 0
         }
-        
-    except mysql.connector.Error as err:
 
+    except mysql.connector.Error as err:
+        conn.rollback()
         print(f"Error en BD: {err}")
         raise HTTPException(status_code=500, detail="Error al descontar stock")
     
