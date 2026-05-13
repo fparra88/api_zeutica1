@@ -38,18 +38,27 @@ async def consultar_ventas(f1: str, f2: str):
         cursor.close()
         conn.close()
         
-@router.get("/verifica-venta/{norden}") # Enpoint para Cleanest Choice verifica si existe venta 
+@router.get("/verifica-venta/{norden}")
 async def verificar_venta(norden: str):
     conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    # Usamos buffered=True para descargar el resultado de inmediato
+    cursor = conn.cursor(dictionary=True, buffered=True)
 
     query = "SELECT id FROM ventasRegistro WHERE id_ventas = %s"
 
     try:
-        cursor.execute(query,(norden,))
+        cursor.execute(query, (norden,))
         existe = cursor.fetchone()
 
+        # Consumimos cualquier otro resultado pendiente por seguridad
+        while cursor.nextset():
+            pass
+
+        # Validamos después de asegurar que el cursor terminó su trabajo
         if not existe:
+            # Cerramos antes del raise para liberar la conexión en AWS de inmediato
+            cursor.close()
+            conn.close()
             raise HTTPException(status_code=404, detail="El registro de venta no existe")
         
         return existe
@@ -58,8 +67,10 @@ async def verificar_venta(norden: str):
         raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
     
     finally:
-        cursor.close()
-        conn.close()
+        # El bloque finally solo actuará si no entró en el if not existe
+        if conn.is_connected():
+            cursor.close()
+            conn.close()
 
 @router.get("/ventas-credito") # Enpoint para mostrar clientes a credito
 async def verificar_venta():

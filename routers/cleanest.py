@@ -177,9 +177,9 @@ class VentaSchema(BaseModel):
     condicion_pago: str
 
 @router.post("/cleanest/venta")
-async def eliminar_pedido(venta: VentaSchema):
+async def ingresar_venta(venta: VentaSchema):
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)
     try:
         # Traigo el stock actual antes de modificarlo
         cursor.execute("SELECT stock_clean FROM productos WHERE sku = %s", (venta.sku,))
@@ -189,22 +189,22 @@ async def eliminar_pedido(venta: VentaSchema):
             raise HTTPException(status_code=404, detail="sku no encontrado")
 
         # Si stock_clean es NULL en BD, lo trato como 0
-        stock_actual = res_existe[0] if res_existe[0] is not None else 0
+        stock_actual = res_existe["stock_clean"] if res_existe["stock_clean"] is not None else 0
 
         if stock_actual < venta.stock_clean:
             raise HTTPException(status_code=400, detail=f"Stock insuficiente. Disponible: {stock_actual}")
 
         cursor.execute("UPDATE productos SET stock_clean = stock_clean - %s WHERE sku = %s", (venta.stock_clean, venta.sku))
-        saldo_inicial = 0
+        saldo_pendiente = 0
 
         sql_insert = """
-            INSERT INTO ventasregistro
+            INSERT IGNORE INTO ventasRegistro
             (id_ventas, sku, producto, cantidad, precio, fecha, nombreComprador, otros, plataforma, usuario, condicion_pago, saldo_pendiente)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
 
         valores = (
-            venta.id_venta,
+            venta.id_venta, 
             venta.sku,
             venta.producto,
             venta.stock_clean,
@@ -215,7 +215,7 @@ async def eliminar_pedido(venta: VentaSchema):
             venta.plataforma,
             venta.usuario,
             venta.condicion_pago,
-            saldo_inicial
+            saldo_pendiente
         )
         cursor.execute(sql_insert, valores)
 
@@ -225,7 +225,7 @@ async def eliminar_pedido(venta: VentaSchema):
             "message": "Venta aplicada exitosamente",
             "sku": venta.sku,
             "nuevo_stock": stock_actual - venta.stock_clean,
-            "saldo_pendiente": saldo_inicial
+            "saldo_pendiente": saldo_pendiente
         }
         
     except mysql.connector.Error as err:

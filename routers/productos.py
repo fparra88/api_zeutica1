@@ -141,7 +141,7 @@ async def registrar_venta(venta: VentaSchema):
 
             # C. Registrar venta en el historial (Actualizado con nuevas columnas)            
             sql_insert = """
-                INSERT INTO ventasRegistro 
+                INSERT IGNORE INTO ventasRegistro 
                 (id_ventas, sku, producto, cantidad, precio, fecha, nombreComprador, otros, plataforma, usuario, condicion_pago, saldo_pendiente) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
