@@ -34,6 +34,10 @@ class CompraModel(BaseModel):
 
 @router.post("/compras")
 async def recibir_compra(compras: List[CompraModel]):
+    """
+    Ingresa compras modificando el valor de stock y registrando el movimiento
+    recibe una lista.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     res_items = []
@@ -99,6 +103,9 @@ async def recibir_compra(compras: List[CompraModel]):
 # ---- Promedio de compras ----
 @router.get("/ultimos-costos/{sku}")
 async def obtener_ultimos_costos(sku: str):
+    """
+    Consulta los ultimos costos registrados para realizar un promedio de costo ultimo.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     
@@ -129,6 +136,9 @@ async def obtener_ultimos_costos(sku: str):
 
 @router.post("/costoPromedio") # Endpoint para registrar costo promedio
 async def costo_promedio(cprom: compraPromedio):
+    """
+    Dependencia que registra el ultimo costo en la tabla de productos.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -164,6 +174,9 @@ async def costo_promedio(cprom: compraPromedio):
 
 @router.get("/registro-compras")
 async def obtener_compras():
+    """
+    Registra las compras en la tabla de compras para debido control.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 

@@ -1,7 +1,7 @@
 import mysql.connector
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
-from typing import Optional
+from typing import Optional, List
 import os
 from dotenv import load_dotenv
 from datetime import date
@@ -29,7 +29,10 @@ class OrdenModel(BaseModel):
     envio3: int
 
 @router.post("/ordenes")
-async def crear_orden(orden: OrdenModel):
+async def crear_orden(ordenes: List[OrdenModel]):
+    """
+    Ingresa una o varias ordenes de Cleanest Choice para su debido tracking.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -37,22 +40,22 @@ async def crear_orden(orden: OrdenModel):
             INSERT INTO cleanestChoice (numero_orden, sku, cantidad, fecha_promesa, status, envio1, envio2, envio3)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
-        valores = (
-            orden.numero_orden,
-            orden.sku,
-            orden.cantidad,
-            orden.fecha_promesa,
-            orden.status,
-            orden.envio1,
-            orden.envio2,
-            orden.envio3
-        )
-        cursor.execute(sql, valores)
+        # Armo la lista de tuplas para el bulk insert
+        val_list = [
+            (o.numero_orden, o.sku, o.cantidad, o.fecha_promesa, o.status, o.envio1, o.envio2, o.envio3)
+            for o in ordenes
+        ]
+        cursor.executemany(sql, val_list)
         conn.commit()
-        return {"msg": "Orden creada", "numero_orden": orden.numero_orden}
+        return {
+            "msg": "Ordenes creadas",
+            "cantidad": len(ordenes),
+            "numeros_orden": [o.numero_orden for o in ordenes]
+        }
     except mysql.connector.Error as err:
+        conn.rollback()
         print(f"Error en BD: {err}")
-        raise HTTPException(status_code=500, detail="Error al guardar la orden en BD")
+        raise HTTPException(status_code=500, detail="Error al guardar las ordenes en BD")
     finally:
         if conn.is_connected():
             cursor.close()
@@ -60,6 +63,9 @@ async def crear_orden(orden: OrdenModel):
 
 @router.get("/cleanest")
 async def obtener_pedidos():
+    """
+    Dependencia para obtener las ordenes actuales.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -81,6 +87,9 @@ class EfirmaModel(BaseModel):
 
 @router.post("/efirma")
 async def efirma(payload: EfirmaModel):
+    """
+    Dependencia para ingresar una firma en base64 a su debida orden.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -100,6 +109,9 @@ async def efirma(payload: EfirmaModel):
 
 @router.get("/obtener-firma")
 async def obtener_firma(numero_orden: str):
+    """
+    Dependencia para consultar firmas ya almacenadas en DB.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:
@@ -140,6 +152,9 @@ class OrdenUpdateModel(BaseModel):
 
 @router.patch("/cleanest/{pedido_id}")
 async def actualizar_pedido(pedido_id: int, payload: OrdenUpdateModel):
+    """
+    Dependencia para actualizar las ordenes en cuanto a envios de mercancia.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -178,6 +193,9 @@ class VentaSchema(BaseModel):
 
 @router.post("/cleanest/venta")
 async def ingresar_venta(venta: VentaSchema):
+    """
+    Ingresa la venta de la orden correspondiente al terminar su tracking y ser cerrada.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     try:

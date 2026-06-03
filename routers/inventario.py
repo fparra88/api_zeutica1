@@ -28,6 +28,9 @@ class ConteoPayload(BaseModel):
 
 @router.post("/inventario/conteo")
 async def registrar_conteo(payload: ConteoPayload):
+    """
+    Dependencia que recibe conteo de inventario ciclico o completo para registro.
+    """
     conn = None
     res_items = []
 

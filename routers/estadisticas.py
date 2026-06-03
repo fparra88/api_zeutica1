@@ -24,6 +24,10 @@ class fechas(BaseModel):
 
 @router.post('/obtener-estadistica')
 async def obtener_estadistica(fecha: fechas):
+    """
+    Consulta y aplica Modelos de ciencia de datos para obtener una proyeccion
+    de venta semanal por sku.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 

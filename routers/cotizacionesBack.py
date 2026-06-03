@@ -47,7 +47,7 @@ class CotizacionSchema(BaseModel):
     pdf: str
     items: List[ItemCotizacion]
 
-# Creamos el "molde" para los datos que enviará Streamlit
+# Creamos el "molde" para los datos que enviará el frontend
 class VinculoFactura(BaseModel):
     codigo_cotizacion: str  
     relacion_factura: Optional[str] = None
@@ -56,6 +56,9 @@ class VinculoFactura(BaseModel):
 
 @router.get("/cotizaciones/nuevo-codigo")
 async def obtener_nuevo_codigo():
+    """
+    Consulta las cotizaciones registradas para asignar nuevo codigo a la cotizacion siguiente.
+    """
     connection = get_db_connection()
     try:
         with connection.cursor(dictionary=True) as cursor:
@@ -83,6 +86,9 @@ async def obtener_nuevo_codigo():
 
 @router.post("/cotizaciones/guardar")
 async def guardar_cotizacion(cot: CotizacionSchema):
+    """
+    Registra la cotizacion en la tabla cotizaciones de DB.
+    """
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
@@ -132,6 +138,9 @@ async def guardar_cotizacion(cot: CotizacionSchema):
 
 @router.get("/consulta/cotizacion")
 async def consulta_cotizacion():
+    """
+    Dependencia para consultar cotizaciones.
+    """
     connection = get_db_connection()
     try:
         # 1. Agregamos dictionary=True para que el JSON sea compatible con Streamlit
@@ -161,10 +170,13 @@ async def consulta_cotizacion():
 
 @router.post("/relacionFactura")
 async def vincular_factura(vinculos: List[VinculoFactura]):
+    """
+    Registra la relacion de cotizacion a factura realizada para vincular pago.
+    """
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-            # Recorremos cada cotización modificada que llegó desde Streamlit
+            # Recorremos cada cotización modificada que llegó desde frontend
             for v in vinculos:
                 # Actualizamos el registro.                 
                 sql = "UPDATE cotizaciones SET relacion_factura = %s, metodo_pago = %s, fecha_pago = %s WHERE codigo_cotizacion = %s"
@@ -191,6 +203,9 @@ class FirmaEnvio(BaseModel):
 
 @router.post("/firma-ventas")
 async def guardar_firma(firma: FirmaEnvio):
+    """
+    Registra firma de cliente cuando retira mercancia de cedis.
+    """
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
@@ -215,6 +230,9 @@ async def guardar_firma(firma: FirmaEnvio):
 
 @router.get("/cotizacion/{cotizacion_id}") # Endpoint para items de cotizacion
 async def obtener_items_cotizacion(cotizacion_id: int):
+    """
+    Dependencia para obtener items asignados a cotizacion.
+    """
     connection = get_db_connection()
     
     try:
@@ -243,6 +261,9 @@ class vendido(BaseModel):
 
 @router.post("/cotizaciones/vendido")
 async def guardar_cotizacion(vendido: vendido):
+    """
+    Marca como vendida una cotizacion para que ya no este disponible en seccion de ventas.
+    """
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:

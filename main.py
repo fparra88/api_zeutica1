@@ -91,6 +91,9 @@ async def test_server():
 
 @app.post("/login")
 async def login(datos: LoginSchema):
+    """
+    Consulta credenciales para ingreso a sistema
+    """
     usuario = datos.usuario
     password_ingresado = datos.password
     conn = get_db_connection()

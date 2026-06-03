@@ -1,7 +1,6 @@
 import mysql.connector
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
-from typing import Optional
 import os
 from dotenv import load_dotenv
 
@@ -21,8 +20,11 @@ class abono(BaseModel):
     id_ventas: int
     saldo_abonado: float
 
-@router.post("/abonos") # Enpoint para agregar cliente a la base de datos
+@router.post("/abonos") # Enpoint para agregar abonos a cuentas de credito
 async def cliente_nuevo(abono: abono):
+    """
+    Agrega abono de saldo a credito para clientes con este beneficio
+    """
     conn = get_db_connection()
     cursor = conn.cursor() 
 

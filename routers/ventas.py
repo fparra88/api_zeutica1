@@ -1,6 +1,7 @@
 import mysql.connector
 from fastapi import APIRouter, HTTPException
 import os
+from pydantic import BaseModel
 from dotenv import load_dotenv
 
 router =APIRouter(tags=["/ventas"],responses={404: {"Mensaje":"No encontrado"}})
@@ -17,6 +18,9 @@ def get_db_connection():
 
 @router.get("/ventas/{f1}/{f2}")
 async def consultar_ventas(f1: str, f2: str):
+    """
+    Consulta ventas por rango de fecha definido por frontend.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True) # Usamos dictionary=True para que devuelva claves como 'sku'
     
@@ -40,6 +44,9 @@ async def consultar_ventas(f1: str, f2: str):
         
 @router.get("/verifica-venta/{norden}")
 async def verificar_venta(norden: str):
+    """
+    Verifica venta en DB.
+    """
     conn = get_db_connection()
     # Usamos buffered=True para descargar el resultado de inmediato
     cursor = conn.cursor(dictionary=True, buffered=True)
@@ -74,6 +81,9 @@ async def verificar_venta(norden: str):
 
 @router.get("/ventas-credito") # Enpoint para mostrar clientes a credito
 async def verificar_venta():
+    """
+    Consulta clientes con credito activo.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 
@@ -94,3 +104,89 @@ async def verificar_venta():
     finally:
         cursor.close()
         conn.close()
+
+# Definimos un modelo para recibir los datos en JSON (Body)
+class VentaSchema(BaseModel):
+    id_venta: int
+    sku: str
+    producto: str
+    stock_bodega: int
+    precio: float
+    fecha: str
+    nombreComprador: str
+    otros: str
+    plataforma: str
+    usuario: str
+    condicion_pago: str
+
+@router.post("/producto/venta")
+async def registrar_venta(venta: VentaSchema):
+    """
+    Registro de venta, se verifica que el stock sea suficiente para continuar.
+    """
+    connection = get_db_connection()
+    try:
+        with connection.cursor(dictionary=True) as cursor:
+            
+            # A. Verificar stock (Se mantiene igual)
+            sql_check = "SELECT stock_bodega FROM productos WHERE sku = %s"
+            cursor.execute(sql_check, (venta.sku,))
+            resultado = cursor.fetchone()
+
+            if not resultado:
+                raise HTTPException(status_code=404, detail="Producto no encontrado")
+            
+            if resultado['stock_bodega'] < venta.stock_bodega:
+                raise HTTPException(status_code=400, detail=f"Stock insuficiente. Solo hay {resultado['stock_bodega']}")
+        
+            # B. Aplicar el descuento al inventario (Se mantiene igual)
+            sql_restar = "UPDATE productos SET stock_bodega = stock_bodega - %s WHERE sku = %s" 
+            cursor.execute(sql_restar, (venta.stock_bodega, venta.sku))
+
+            # --- NUEVA LÓGICA DE CRÉDITO ---
+            # Calculamos el saldo inicial. Si es CRÉDITO, el saldo es el total (precio * cantidad)
+            # Si es CONTADO, el saldo es 0.
+            total_operacion = venta.precio * venta.stock_bodega
+            saldo_inicial = total_operacion if venta.condicion_pago == "CREDITO" else 0.00
+
+            # C. Registrar venta en el historial (Actualizado con nuevas columnas)            
+            sql_insert = """
+                INSERT IGNORE INTO ventasRegistro 
+                (id_ventas, sku, producto, cantidad, precio, fecha, nombreComprador, otros, plataforma, usuario, condicion_pago, saldo_pendiente) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            valores = (
+                venta.id_venta, 
+                venta.sku, 
+                venta.producto, 
+                venta.stock_bodega, 
+                venta.precio, 
+                venta.fecha, 
+                venta.nombreComprador, 
+                venta.otros, 
+                venta.plataforma, 
+                venta.usuario,
+                venta.condicion_pago, # Nuevo campo
+                saldo_inicial         # Nuevo campo calculado
+            )
+            cursor.execute(sql_insert, valores)
+
+            # D. Confirmar cambios
+            connection.commit()
+
+            return {
+                "message": "Venta aplicada exitosamente", 
+                "sku": venta.sku, 
+                "nuevo_stock": resultado['stock_bodega'] - venta.stock_bodega,
+                "saldo_pendiente": saldo_inicial
+            }
+
+    except mysql.connector.Error as err:
+        connection.rollback()
+        print(f"Error SQL: {err}")
+        raise HTTPException(status_code=500, detail=f"Error en base de datos: {err}")
+    
+    finally:
+        if connection.is_connected():
+            connection.close()

@@ -28,6 +28,9 @@ class LoteTraspaso(BaseModel):
 
 @router.post("/traspaso")
 async def traspaso_multiple(lote: LoteTraspaso):
+    """
+    Realiza traspaso de stock entre stock_bodega y stock_full.
+    """
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
     
@@ -72,6 +75,9 @@ async def traspaso_multiple(lote: LoteTraspaso):
 
 @router.get("/traspasos/reporte") # Endpoint para consultar traspasos realizados.
 async def consulta_traspasos():
+    """
+    Consulta los traspasos registrados en DB.
+    """
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
@@ -95,6 +101,9 @@ async def consulta_traspasos():
 
 @router.post("/traspaso/clean")
 async def traspaso_multiple(lote: LoteTraspaso):
+    """
+    Realiza traspaso stock entre stock_bodega a stock_clean.
+    """
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
     

@@ -17,6 +17,9 @@ def get_db_connection():
 
 @router.get("/finanzas/cxc")
 async def obtener_cxc():
+    """
+    En construccion seccion de cuentas pendientes.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
 

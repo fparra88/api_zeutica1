@@ -44,6 +44,9 @@ class clienteEditar(clienteRfc): # molde para editar cliente con id
     
 @router.get("/clientes") #Endpoint para consultar clientes en base de datos
 async def obtener_clientes():
+    """
+    Consulta los clientes registrados en DB.
+    """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True) 
 
@@ -68,6 +71,9 @@ async def obtener_clientes():
 
 @router.post("/clientenuevo") # Enpoint para agregar cliente a la base de datos
 async def cliente_nuevo(cliente: clienteRfc):
+    """
+    Dependencia para ingresar un cliente nuevo a DB.
+    """
     conn = get_db_connection()
     cursor = conn.cursor() 
 
@@ -96,6 +102,9 @@ async def cliente_nuevo(cliente: clienteRfc):
 
 @router.post("/editcliente") # Endpoint para editar cliente existente en la base de datos
 async def edit_cliente(cliente: clienteEditar):
+    """
+    Dependencia para editar un cliente ya registrado.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
 

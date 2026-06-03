@@ -40,6 +40,9 @@ class GastoResp(BaseModel):
 
 @router.post("/gastos") # Endpoint para registrar gastos operativos
 async def registrar_gasto(gasto: Gasto):
+    """
+    Registra gastos operativos usados en cedis por usuario para la operacion.
+    """
     conn = get_db_connection()
     cursor = conn.cursor()
 
