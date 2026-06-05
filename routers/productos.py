@@ -20,6 +20,12 @@ def get_db_connection():
 
 
 
+class UbicacionEditSchema(BaseModel):
+    """Modelo para editar ubicación por sku"""
+    warehouse_id: int
+    cantidad: int
+
+
 class ProdEditSchema(BaseModel):
     """Modelo para recibir productos editados desde el frontend"""
     productos: list[dict]
@@ -255,8 +261,68 @@ async def crear_producto(prod: ProdNuevoSchema):
         conn.rollback()
         print(f"Error en inserción: {err}")
         raise HTTPException(status_code=500, detail=f"Error en base de datos: {err}")
-    
+
     finally:
         if conn.is_connected():
             cursor.close()
             conn.close()
+
+
+@router.get("/productos/ubicaciones/{sku}")
+async def ubicaciones_por_sku(sku: str):
+    """
+    Busco en stock_ubicacion todo lo que tenga ese sku.
+    Si no hay nada, mando 404 claro.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True, buffered=True)
+
+    try:
+        # Traigo todas las filas de ubicaciones para ese sku
+        cursor.execute("SELECT * FROM stock_ubicacion WHERE sku = %s", (sku,))
+        ubicaciones = cursor.fetchall()
+
+        if not ubicaciones:
+            raise HTTPException(status_code=404, detail=f"No se encontraron ubicaciones para SKU '{sku}'")
+
+        return ubicaciones
+
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@router.put("/ubicacion/editar/{sku}")
+async def editar_ubicacion(sku: str, datos: UbicacionEditSchema):
+    """
+    Actualizo warehouse_id y cantidad en stock_ubicacion para el sku dado.
+    Si no existe el registro, aviso con 404.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        sql_upd = "UPDATE stock_ubicacion SET warehouse_id = %s, cantidad = %s WHERE sku = %s"
+        cursor.execute(sql_upd, (datos.warehouse_id, datos.cantidad, sku))
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"No existe registro en stock_ubicacion para SKU '{sku}'")
+
+        conn.commit()
+        return {
+            "mensaje": "Ubicación actualizada",
+            "sku": sku,
+            "warehouse_id": datos.warehouse_id,
+            "cantidad": datos.cantidad
+        }
+
+    except mysql.connector.Error as err:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+
+    finally:
+        cursor.close()
+        conn.close()
