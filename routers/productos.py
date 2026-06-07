@@ -22,7 +22,7 @@ def get_db_connection():
 
 class UbicacionEditSchema(BaseModel):
     """Modelo para editar ubicación por sku"""
-    warehouse_id: int
+    warehouse_id: str
     cantidad: int
 
 
@@ -295,6 +295,63 @@ async def ubicaciones_por_sku(sku: str):
         conn.close()
 
 
+@router.post("/productos/ubicacionNueva/{sku}")
+async def nueva_ubicacion(sku: str, datos: UbicacionEditSchema):
+    """
+    Inserto fila nueva en stock_ubicacion para el sku recibido.
+    Si ya existe ese sku, igual inserto — pueden haber varias ubicaciones.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        sql_ins = "INSERT INTO stock_ubicacion (sku, warehouse_id, cantidad) VALUES (%s, %s, %s)"
+        cursor.execute(sql_ins, (sku, datos.warehouse_id, datos.cantidad))
+        conn.commit()
+
+        return {
+            "mensaje": "Ubicación creada",
+            "sku": sku,
+            "warehouse_id": datos.warehouse_id,
+            "cantidad": datos.cantidad
+        }
+
+    except mysql.connector.Error as err:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@router.delete("/producto/eliminarUbi/{id}")
+async def eliminar_ubicacion(id: int):
+    """
+    Borro el registro de stock_ubicacion que tenga ese id.
+    Si no existe, aviso con 404.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("DELETE FROM stock_ubicacion WHERE id = %s", (id,))
+
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail=f"No existe registro con id '{id}' en stock_ubicacion")
+
+        conn.commit()
+        return {"mensaje": "Ubicación eliminada", "id": id}
+
+    except mysql.connector.Error as err:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
 @router.put("/ubicacion/editar/{sku}")
 async def editar_ubicacion(sku: str, datos: UbicacionEditSchema):
     """
@@ -326,3 +383,4 @@ async def editar_ubicacion(sku: str, datos: UbicacionEditSchema):
     finally:
         cursor.close()
         conn.close()
+
