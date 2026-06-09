@@ -352,8 +352,8 @@ async def eliminar_ubicacion(id: int):
         conn.close()
 
 
-@router.put("/ubicacion/editar/{sku}")
-async def editar_ubicacion(sku: str, datos: UbicacionEditSchema):
+@router.put("/ubicacion/editar/{id}")
+async def editar_ubicacion(id: str, datos: UbicacionEditSchema):
     """
     Actualizo warehouse_id y cantidad en stock_ubicacion para el sku dado.
     Si no existe el registro, aviso con 404.
@@ -362,16 +362,16 @@ async def editar_ubicacion(sku: str, datos: UbicacionEditSchema):
     cursor = conn.cursor()
 
     try:
-        sql_upd = "UPDATE stock_ubicacion SET warehouse_id = %s, cantidad = %s WHERE sku = %s"
-        cursor.execute(sql_upd, (datos.warehouse_id, datos.cantidad, sku))
+        sql_upd = "UPDATE stock_ubicacion SET warehouse_id = %s, cantidad = %s WHERE id = %s"
+        cursor.execute(sql_upd, (datos.warehouse_id, datos.cantidad, id))
 
         if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail=f"No existe registro en stock_ubicacion para SKU '{sku}'")
+            raise HTTPException(status_code=404, detail=f"No existe registro en stock_ubicacion para SKU '{id}'")
 
         conn.commit()
         return {
             "mensaje": "Ubicación actualizada",
-            "sku": sku,
+            "sku": id,
             "warehouse_id": datos.warehouse_id,
             "cantidad": datos.cantidad
         }

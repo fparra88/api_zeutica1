@@ -2,7 +2,8 @@
 import bcrypt
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from routers import cotizacionesBack, productos, ventas, clientes, traspaso, gastos, compras, cleanest, cuentas_pendientes, abonos, estadisticas, inventario
+from routers import cotizacionesBack, productos, ventas, clientes, traspaso, gastos, compras, cleanest, cuentas_pendientes,\
+      abonos, estadisticas, inventario, empleados
 import mysql.connector
 from fastapi.middleware.cors import CORSMiddleware
 import os, secrets
@@ -39,6 +40,7 @@ def obtener_usuario_actual(credentials: HTTPAuthorizationCredentials = Depends(s
 # Corregido: FastAPI usa root_path, no prefix. 
 app = FastAPI(root_path="/zeutica", tags=["login"], responses={404: {"Mensaje":"No encontrado"}})
 
+# Paginas
 app.include_router(productos.router, dependencies=[Depends(obtener_usuario_actual)])
 app.include_router(ventas.router, dependencies=[Depends(obtener_usuario_actual)])
 app.include_router(clientes.router, dependencies=[Depends(obtener_usuario_actual)])
@@ -51,6 +53,7 @@ app.include_router(cuentas_pendientes.router, dependencies=[Depends(obtener_usua
 app.include_router(abonos.router, dependencies=[Depends(obtener_usuario_actual)])
 app.include_router(estadisticas.router, dependencies=[Depends(obtener_usuario_actual)])
 app.include_router(inventario.router, dependencies=[Depends(obtener_usuario_actual)])
+app.include_router(empleados.router, dependencies=[Depends(obtener_usuario_actual)])
 
 app.add_middleware(
     CORSMiddleware,
@@ -96,35 +99,50 @@ async def login(datos: LoginSchema):
     """
     usuario = datos.usuario
     password_ingresado = datos.password
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    conn = None
+    cursor = None
     try:
-        query = "SELECT password_hash FROM usuarios WHERE nombre_usuario = %s"
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        query = """
+            SELECT u.password_hash, e.estatus
+            FROM usuarios u
+            LEFT JOIN empleados e ON e.usuario = u.nombre_usuario
+            WHERE u.nombre_usuario = %s
+        """
         cursor.execute(query, (usuario,))
         resultado = cursor.fetchone()
-        if resultado:
-            hash_guardado = resultado['password_hash']
-            if verify_password(password_ingresado, hash_guardado):
-                # Genero y guardo el token en la base de datos
-                nuevo_token = secrets.token_urlsafe(32)
-                try:
-                    update_query = "UPDATE usuarios SET token = %s WHERE nombre_usuario = %s"
-                    cursor.execute(update_query, (nuevo_token, usuario))
-                    conn.commit()
-                except mysql.connector.Error as err:
-                    print(f"Error guardando token: {err}")
-                    raise HTTPException(status_code=500, detail="Error guardando token en DB")
-                return {
-                    "auth": True,
-                    "mensaje": "Acceso exitoso",
-                    "access_token": nuevo_token,
-                    "token_type": "bearer"
-                }
-        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
-    finally:
-        cursor.close()
-        conn.close()
 
+        # Primero verifico que exista, luego reviso estatus
+        if not resultado:
+            raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+
+        if resultado['estatus'] == 0:
+            raise HTTPException(status_code=403, detail="Usuario inactivo. Contacta al administrador.")
+
+        if verify_password(password_ingresado, resultado['password_hash']):
+            nuevo_token = secrets.token_urlsafe(32)
+            update_query = "UPDATE usuarios SET token = %s WHERE nombre_usuario = %s"
+            cursor.execute(update_query, (nuevo_token, usuario))
+            conn.commit()
+            return {
+                "auth": True,
+                "mensaje": "Acceso exitoso",
+                "access_token": nuevo_token,
+                "token_type": "bearer"
+            }
+
+        raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+
+    except mysql.connector.Error as err:
+        print(f"Error DB login: {err}")
+        raise HTTPException(status_code=500, detail="Error interno en DB")
+        
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()
 
 
 # Documentacion ip.server/docs (swagger)
