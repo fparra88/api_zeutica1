@@ -139,30 +139,42 @@ async def guardar_cotizacion(cot: CotizacionSchema):
 @router.get("/consulta/cotizacion")
 async def consulta_cotizacion():
     """
-    Dependencia para consultar cotizaciones.
+    Dependencia para consultar cotizaciones con sus items.
     """
     connection = get_db_connection()
     try:
-        # 1. Agregamos dictionary=True para que el JSON sea compatible con Streamlit
         with connection.cursor(dictionary=True) as cursor:
             cursor.execute("SELECT * FROM cotizaciones")
-            
-            cotizaciones = cursor.fetchall() 
+            cotizaciones = cursor.fetchall()
 
             if not cotizaciones:
                 raise HTTPException(status_code=404, detail="No se encontraron cotizaciones")
 
-            # 3. ¡Truco vital!: Convertimos Decimales a float para evitar el Error 500
+            # Convierto tipos no serializables en maestro
             for c in cotizaciones:
                 for key, value in c.items():
                     if isinstance(value, (Decimal, datetime.date)):
-                        c[key] = str(value) # O float(value) si es dinero
+                        c[key] = str(value)
+
+            # Ahora traigo todos los items de una vez para evitar consultas repetidas
+            todos_items = cursor.fetchall()
+
+            # Convierto tipos en items y los agrupo por cotizacion_id
+            items_map: dict = {c["id"]: [] for c in cotizaciones}
+            for item in todos_items:
+                for key, value in item.items():
+                    if isinstance(value, (Decimal, datetime.date)):
+                        item[key] = str(value)
+                items_map[item["cotizacion_id"]].append(item)
+
+            # Inyecto lista de items en cada cotización
+            for c in cotizaciones:
+                c["items"] = items_map.get(c["id"], [])
 
             return {"cotizaciones": cotizaciones}
 
     except Exception as e:
-        # Esto imprimirá el error REAL en tu consola de AWS para que sepas qué pasó
-        print(f"Error detectado: {e}") 
+        print(f"Error detectado: {e}")
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
     finally:
         connection.close()

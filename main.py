@@ -76,6 +76,10 @@ class LoginSchema(BaseModel): #molde para usuario
     usuario: str
     password: str
 
+class CambioPasswSchema(BaseModel): #molde para cambio de contraseña
+    usuario: str
+    password_nueva: str
+
 # // AUTENTICACION DE USUARIOS PARA INGRESO AL SOFTWARE // 
 def hash_password(password: str) -> str:
     pwd_bytes = password.encode('utf-8')
@@ -137,7 +141,44 @@ async def login(datos: LoginSchema):
     except mysql.connector.Error as err:
         print(f"Error DB login: {err}")
         raise HTTPException(status_code=500, detail="Error interno en DB")
-        
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()
+
+
+@app.put("/cambio-passw")
+async def cambio_passw(datos: CambioPasswSchema):
+    """
+    Cambia la contraseña del usuario. Encripto antes de guardar.
+    """
+    usuario = datos.usuario
+    password_nueva = datos.password_nueva
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        # Primero checo que el usuario exista, si no ni le muevo
+        cursor.execute("SELECT nombre_usuario FROM usuarios WHERE nombre_usuario = %s", (usuario,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+        # Encripto la nueva contraseña antes de meterla a la DB
+        hash_nuevo = hash_password(password_nueva)
+        update_query = "UPDATE usuarios SET password_hash = %s WHERE nombre_usuario = %s"
+        cursor.execute(update_query, (hash_nuevo, usuario))
+        conn.commit()
+
+        return {"mensaje": "Contraseña actualizada"}
+
+    except mysql.connector.Error as err:
+        print(f"Error DB cambio passw: {err}")
+        raise HTTPException(status_code=500, detail="Error interno en DB")
+
     finally:
         if cursor:
             cursor.close()
