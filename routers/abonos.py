@@ -20,54 +20,52 @@ class abono(BaseModel):
     id_ventas: int
     saldo_abonado: float
 
-@router.post("/abonos") # Enpoint para agregar abonos a cuentas de credito
-async def cliente_nuevo(abono: abono):
+@router.post("/abonos") 
+async def registrar_abono(abono: abono): # Cambié el nombre de la función para que sea más descriptivo
     """
-    Agrega abono de saldo a credito para clientes con este beneficio
+    Agrega abono de saldo a crédito para clientes con este beneficio
     """
     conn = get_db_connection()
-    cursor = conn.cursor() 
+    # Forzamos dictionary=False aquí para asegurar que fetchone() devuelva una tupla indexada por posición
+    cursor = conn.cursor(dictionary=False) 
 
-    # El Query de inserción
-    query = """
-        INSERT INTO abonos (id_ventas, saldo_abonado ) 
+    query_insert = """
+        INSERT INTO abonos (id_ventas, saldo_abonado) 
         VALUES (%s, %s)
     """
-
-    # Extraemos los valores del objeto cliente
-    valores = (abono.id_ventas, abono.saldo_abonado)
+    valores_insert = (str(abono.id_ventas), abono.saldo_abonado)
 
     try:
-        # Primero meto el abono al historial
-        cursor.execute(query, valores)
+        # 1. Registrar el abono en el historial
+        cursor.execute(query_insert, valores_insert)
 
-        # Ahora le resto lo abonado al saldo pendiente de la venta
-        cursor.execute(
-            "UPDATE ventasRegistro SET saldo_pendiente = saldo_pendiente - %s WHERE id_ventas = %s",
-            (abono.saldo_abonado, abono.id_ventas)
-        )
+        # 2. Restar lo abonado al saldo pendiente (Forzamos a string el id_ventas para evitar el 1292)
+        query_update = "UPDATE ventasRegistro SET saldo_pendiente = saldo_pendiente - %s WHERE id_ventas = %s"
+        cursor.execute(query_update, (abono.saldo_abonado, str(abono.id_ventas)))
 
-        # Consulto el saldo que quedó para saber si ya quedó a mano
-        cursor.execute(
-            "SELECT saldo_pendiente FROM ventasRegistro WHERE id_ventas = %s",
-            (abono.id_ventas,)
-        )
+        # 3. Consultar el saldo que quedó
+        query_select = "SELECT saldo_pendiente FROM ventasRegistro WHERE id_ventas = %s"
+        cursor.execute(query_select, (str(abono.id_ventas),))
         res = cursor.fetchone()
 
-        conn.commit()
-
+        # 4. Validar la respuesta ANTES de hacer el commit definitivo
         if res is None:
-            raise HTTPException(status_code=404, detail="Venta no encontrada en ventasregistro")
+            conn.rollback() # Si la venta no existe, deshacemos el INSERT que hicimos arriba
+            raise HTTPException(status_code=404, detail="Venta no encontrada en ventasRegistro")
 
+        # Como forzamos dictionary=False, res[0] es completamente seguro
         saldo_restante = res[0]
+
+        # 5. Si todo está perfecto, guardamos los cambios en la base de datos de AWS
+        conn.commit()
 
         if saldo_restante <= 0:
             return {"mensaje": "Deuda saldada", "saldo_pendiente": 0}
 
-        return {"mensaje": "Abono registrado", "saldo_pendiente": saldo_restante}
+        return {"mensaje": "Abono registrado", "saldo_pendiente": float(saldo_restante)}
 
     except mysql.connector.Error as err:
-        conn.rollback() # Si la DB truena, deshago todo
+        conn.rollback() 
         raise HTTPException(status_code=500, detail=f"Error en DB: {err}")
 
     finally:
