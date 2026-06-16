@@ -3,7 +3,7 @@ import bcrypt
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from routers import cotizacionesBack, productos, ventas, clientes, traspaso, gastos, compras, cleanest, cuentas_pendientes,\
-      abonos, estadisticas, inventario, empleados
+      abonos, estadisticas, inventario, empleados, notificaciones
 import mysql.connector
 from fastapi.middleware.cors import CORSMiddleware
 import os, secrets
@@ -54,6 +54,7 @@ app.include_router(abonos.router, dependencies=[Depends(obtener_usuario_actual)]
 app.include_router(estadisticas.router, dependencies=[Depends(obtener_usuario_actual)])
 app.include_router(inventario.router, dependencies=[Depends(obtener_usuario_actual)])
 app.include_router(empleados.router, dependencies=[Depends(obtener_usuario_actual)])
+app.include_router(notificaciones.router, dependencies=[Depends(obtener_usuario_actual)])
 
 app.add_middleware(
     CORSMiddleware,
@@ -109,7 +110,7 @@ async def login(datos: LoginSchema):
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         query = """
-            SELECT u.password_hash, e.estatus
+            SELECT u.password_hash, u.id, e.estatus
             FROM usuarios u
             LEFT JOIN empleados e ON e.usuario = u.nombre_usuario
             WHERE u.nombre_usuario = %s
@@ -133,7 +134,8 @@ async def login(datos: LoginSchema):
                 "auth": True,
                 "mensaje": "Acceso exitoso",
                 "access_token": nuevo_token,
-                "token_type": "bearer"
+                "token_type": "bearer",
+                "id_usuario": resultado['id']
             }
 
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")

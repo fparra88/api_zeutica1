@@ -17,10 +17,50 @@ def get_db_connection():
     )
 
 class abono(BaseModel):
+    usuario: str
     id_ventas: int
     saldo_abonado: float
 
-@router.post("/abonos") 
+@router.get("/abonos-registro")
+async def listar_abonos():
+    """
+    Traigo todos los abonos y les pego los datos de la venta por el FK id_ventas.
+    Así en una sola lista veo qué se abonó y de qué venta vino.
+    """
+    conn = get_db_connection()
+    # Uso dictionary=True para devolver llaves nombradas y armar el JSON directo
+    cursor = conn.cursor(dictionary=True)
+
+    # JOIN por el FK id_ventas: del abono saco el saldo abonado, de la venta el resto
+    query_join = """
+        SELECT
+            a.id,
+            a.id_ventas,
+            a.saldo_abonado,
+            v.sku,
+            v.producto,
+            v.cantidad,
+            v.precio,
+            v.nombreComprador,
+            v.saldo_pendiente
+        FROM abonos a
+        INNER JOIN ventasRegistro v ON a.id_ventas = v.id_ventas
+    """
+
+    try:
+        cursor.execute(query_join)
+        res = cursor.fetchall()
+        return res
+
+    except mysql.connector.Error as err:
+        # Si truena la DB, me entero aquí qué pasó
+        raise HTTPException(status_code=500, detail=f"Error en DB: {err}")
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.post("/abonos")
 async def registrar_abono(abono: abono): # Cambié el nombre de la función para que sea más descriptivo
     """
     Agrega abono de saldo a crédito para clientes con este beneficio
@@ -60,7 +100,20 @@ async def registrar_abono(abono: abono): # Cambié el nombre de la función para
         conn.commit()
 
         if saldo_restante <= 0:
+            cursor.execute(
+                "INSERT INTO notificaciones (empleado_id, titulo, mensaje, tipo) VALUES (%s, %s, %s, %s)",
+                (1, "Deuda Saldada", f"La venta {abono.id_ventas} ha sido liquidada totalmente. usuario: {abono.usuario}", "credito")
+            )
+            conn.commit()
             return {"mensaje": "Deuda saldada", "saldo_pendiente": 0}
+
+        if res:
+            cursor.execute(
+                "INSERT INTO notificaciones (empleado_id, titulo, mensaje, tipo) VALUES (%s, %s, %s, %s)",
+                (1, "Abono Realizado", f"Se ha realizado un abono para la venta {abono.id_ventas}. usuario: {abono.usuario}", "credito")
+            )
+            conn.commit()
+            return {"mensaje": "Abono realizado", "saldo_pendiente": saldo_restante}
 
         return {"mensaje": "Abono registrado", "saldo_pendiente": float(saldo_restante)}
 
