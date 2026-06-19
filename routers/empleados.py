@@ -166,3 +166,25 @@ async def crear_empleado(datos: EmpleadoBase):
     finally:
         cursor.close()
         conn.close()
+
+@router.get("/registro-login")
+async def obtener_registro_login():
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        query = "SELECT * FROM registro_login"
+        cursor.execute(query)
+        resultados = cursor.fetchall()
+
+        if not resultados:
+            raise HTTPException(status_code=404, detail="No se encontraron registros de login")
+
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error al obtener registros de login: {err}")
+
+    finally:
+        cursor.close()
+        conn.close()
+
+    return {"status": "success", "data": resultados}

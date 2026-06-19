@@ -384,3 +384,68 @@ async def editar_ubicacion(id: str, datos: UbicacionEditSchema):
         cursor.close()
         conn.close()
 
+class DevolucionSchema(BaseModel):
+    """Modelo para registrar una devolución de producto"""
+    sku: str
+    producto: str
+    cantidad: int
+    plataforma: str
+    reingreso: bool
+
+@router.post("/producto/devolucion/{sku}")
+async def registrar_devolucion(sku: str, datos: DevolucionSchema):
+    """
+    Registro una devolución de producto. Inserto una fila en devoluciones con los datos recibidos.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        sql_ins = "INSERT INTO devoluciones (sku, producto, cantidad, plataforma, reingreso) VALUES (%s, %s, %s, %s, %s)"
+        cursor.execute(sql_ins, (sku, datos.producto, datos.cantidad, datos.plataforma, datos.reingreso))
+        conn.commit()
+        
+        if datos.reingreso == True:
+            # Si es reingreso, también actualizo el stock_bodega del producto sumando 1
+            cursor.execute("UPDATE productos SET stock_bodega = stock_bodega + %s WHERE sku = %s", (datos.cantidad, sku,))
+            conn.commit()
+
+        return {
+            "mensaje": "Devolución registrada",
+            "sku": sku,
+            "producto": datos.producto,
+            "plataforma": datos.plataforma,
+            "reingreso": datos.reingreso
+        }
+
+    except mysql.connector.Error as err:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.get("/productos/devoluciones")
+async def obtener_devoluciones():
+    """
+    Traigo todas las devoluciones registradas en la tabla devoluciones.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("SELECT * FROM devoluciones")
+        devoluciones = cursor.fetchall()
+
+        if not devoluciones:
+            raise HTTPException(status_code=404, detail="No se han registrado devoluciones")
+
+        return devoluciones
+
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+
+    finally:
+        cursor.close()
+        conn.close()

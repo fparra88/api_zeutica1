@@ -3,18 +3,18 @@ import bcrypt
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from routers import cotizacionesBack, productos, ventas, clientes, traspaso, gastos, compras, cleanest, cuentas_pendientes,\
-      abonos, estadisticas, inventario, empleados, notificaciones
+      abonos, estadisticas, inventario, empleados, notificaciones, cuentas_pagar
 import mysql.connector
 from fastapi.middleware.cors import CORSMiddleware
 import os, secrets
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
-# --- 1. CONFIGURACIÓN DE SEGURIDAD Y ESTADO ---
+# ---  CONFIGURACIÓN DE SEGURIDAD Y ESTADO ---
 security = HTTPBearer()
 
 
-# --- 2. DEPENDENCIA PARA VALIDAR EL TOKEN EN TUS RUTAS ---
+# ---  DEPENDENCIA PARA VALIDAR EL TOKEN EN LAS RUTAS ---
 def obtener_usuario_actual(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     conn = get_db_connection()
@@ -55,6 +55,7 @@ app.include_router(estadisticas.router, dependencies=[Depends(obtener_usuario_ac
 app.include_router(inventario.router, dependencies=[Depends(obtener_usuario_actual)])
 app.include_router(empleados.router, dependencies=[Depends(obtener_usuario_actual)])
 app.include_router(notificaciones.router, dependencies=[Depends(obtener_usuario_actual)])
+app.include_router(cuentas_pagar.router, dependencies=[Depends(obtener_usuario_actual)])
 
 app.add_middleware(
     CORSMiddleware,
@@ -123,20 +124,29 @@ async def login(datos: LoginSchema):
             raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
 
         if resultado['estatus'] == 0:
-            raise HTTPException(status_code=403, detail="Usuario inactivo. Contacta al administrador.")
+            raise HTTPException(status_code=403, detail="Usuario inactivo. Contacta al administrador.")  
+        
+        if resultado['estatus'] == 1:
+            cursor.execute(
+                "INSERT INTO registro_login (nombre_usuario, nombre) VALUES (%s, %s)",
+                (datos.usuario, 'Datos de empleado no disponible')
+            )
+            conn.commit()
 
         if verify_password(password_ingresado, resultado['password_hash']):
             nuevo_token = secrets.token_urlsafe(32)
             update_query = "UPDATE usuarios SET token = %s WHERE nombre_usuario = %s"
             cursor.execute(update_query, (nuevo_token, usuario))
             conn.commit()
+                        
             return {
                 "auth": True,
                 "mensaje": "Acceso exitoso",
                 "access_token": nuevo_token,
                 "token_type": "bearer",
                 "id_usuario": resultado['id']
-            }
+            }       
+           
 
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
 

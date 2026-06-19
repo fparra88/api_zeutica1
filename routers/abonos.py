@@ -102,7 +102,7 @@ async def registrar_abono(abono: abono): # Cambié el nombre de la función para
         if saldo_restante <= 0:
             cursor.execute(
                 "INSERT INTO notificaciones (empleado_id, titulo, mensaje, tipo) VALUES (%s, %s, %s, %s)",
-                (1, "Deuda Saldada", f"La venta {abono.id_ventas} ha sido liquidada totalmente. usuario: {abono.usuario}", "credito")
+                (2, "Deuda Saldada", f"La venta {abono.id_ventas} ha sido liquidada totalmente. usuario: {abono.usuario}", "credito")
             )
             conn.commit()
             return {"mensaje": "Deuda saldada", "saldo_pendiente": 0}
@@ -110,7 +110,7 @@ async def registrar_abono(abono: abono): # Cambié el nombre de la función para
         if res:
             cursor.execute(
                 "INSERT INTO notificaciones (empleado_id, titulo, mensaje, tipo) VALUES (%s, %s, %s, %s)",
-                (1, "Abono Realizado", f"Se ha realizado un abono para la venta {abono.id_ventas}. usuario: {abono.usuario}", "credito")
+                (2, "Abono Realizado", f"Se ha realizado un abono para la venta {abono.id_ventas}. usuario: {abono.usuario}", "credito")
             )
             conn.commit()
             return {"mensaje": "Abono realizado", "saldo_pendiente": saldo_restante}
