@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException
 from typing import List
 from decimal import Decimal
 import datetime
-import os
+import os, mov_reg
 from dotenv import load_dotenv
 from typing import Optional
 
@@ -53,6 +53,7 @@ class VinculoFactura(BaseModel):
     relacion_factura: Optional[str] = None
     metodo_pago: Optional[str] = None
     fecha_pago: Optional[str] = None
+    usuario: str
 
 @router.get("/cotizaciones/nuevo-codigo")
 async def obtener_nuevo_codigo():
@@ -123,16 +124,21 @@ async def guardar_cotizacion(cot: CotizacionSchema):
             cursor.executemany(sql_detalle, items_data)
             
             connection.commit()
+
+            mov_reg.registrar_movimiento(cot.usuario, f"Registró una nueva cotización: {cot.codigo_cotizacion}", "Cotizaciones")
+
             return {"status": "success", "id": cotizacion_id}
             
     except mysql.connector.Error as err:
         connection.rollback()
         print(f"Error BD al guardar cotización: {err}")
         raise HTTPException(status_code=500, detail=f"Error BD: {str(err)}")
+    
     except Exception as e:
         connection.rollback()
         print(f"Error inesperado: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    
     finally:
         connection.close()
 
@@ -196,6 +202,8 @@ async def vincular_factura(vinculos: List[VinculoFactura]):
             
             # Guardamos los cambios
             connection.commit()
+
+            mov_reg.registrar_movimiento(vinculos[0].usuario, f"Vinculó factura {v.relacion_factura} a cotización {v.codigo_cotizacion}", "Cotizaciones")
             
         return {"status": "success", "mensaje": "Facturas vinculadas"}
         
@@ -230,12 +238,16 @@ async def guardar_firma(firma: FirmaEnvio):
                 raise HTTPException(status_code=404, detail=f"Cotización {firma.codigo_cotizacion} no encontrada")
 
             connection.commit()
+
+            mov_reg.registrar_movimiento(firma.usuario, f"Guardó firma para cotización {firma.codigo_cotizacion}", "Cotizaciones")
+
             return {"status": "success", "mensaje": f"Firma guardada en {firma.codigo_cotizacion}"}
 
     except mysql.connector.Error as err:
         connection.rollback()
         print(f"Error BD al guardar firma: {err}")
         raise HTTPException(status_code=500, detail=f"Error BD: {str(err)}")
+    
     finally:
         connection.close()
 

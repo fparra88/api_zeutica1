@@ -1,7 +1,7 @@
 import mysql.connector
 from pydantic import BaseModel, ConfigDict
 from fastapi import APIRouter, HTTPException
-import os
+import os, mov_reg
 from dotenv import load_dotenv
 
 router =APIRouter(tags=["/gastos"],responses={404: {"Mensaje":"No encontrado"}})
@@ -52,6 +52,7 @@ async def registrar_gasto(gasto: Gasto):
     try:
         cursor.execute(query, values)
         conn.commit()
+        mov_reg.registrar_movimiento(gasto.usuario_registro, f"Registró un gasto: {gasto.descripcion} por {gasto.costo * gasto.cantidad}", "Gastos")
         return {"mensaje": "Gasto registrado exitosamente"}
     
     except mysql.connector.Error as err:

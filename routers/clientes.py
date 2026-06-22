@@ -2,7 +2,7 @@ import mysql.connector
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
 from typing import Optional
-import os
+import os, mov_reg
 from dotenv import load_dotenv
 
 router =APIRouter(tags=["/clientes"],responses={404: {"Mensaje":"No encontrado"}})
@@ -69,8 +69,8 @@ async def obtener_clientes():
         conn.close()
 
 
-@router.post("/clientenuevo") # Enpoint para agregar cliente a la base de datos
-async def cliente_nuevo(cliente: clienteRfc):
+@router.post("/clientenuevo/{usuario}") # Enpoint para agregar cliente a la base de datos
+async def cliente_nuevo(cliente: clienteRfc, usuario: str):
     """
     Dependencia para ingresar un cliente nuevo a DB.
     """
@@ -89,6 +89,7 @@ async def cliente_nuevo(cliente: clienteRfc):
     try:
         cursor.execute(query, valores)
         conn.commit() # ¡Vital para guardar en MySQL!
+        mov_reg.registrar_movimiento(usuario, f"Registró un nuevo cliente: {cliente.nombre}", "Clientes")
         return {"mensaje": "Cliente agregado con éxito ", "id ": cursor.lastrowid}
     
     except mysql.connector.Error as err:
@@ -100,8 +101,8 @@ async def cliente_nuevo(cliente: clienteRfc):
         conn.close()
 
 
-@router.post("/editcliente") # Endpoint para editar cliente existente en la base de datos
-async def edit_cliente(cliente: clienteEditar):
+@router.post("/editcliente/{usuario}") # Endpoint para editar cliente existente en la base de datos
+async def edit_cliente(cliente: clienteEditar, usuario: str):
     """
     Dependencia para editar un cliente ya registrado.
     """
@@ -123,7 +124,7 @@ async def edit_cliente(cliente: clienteEditar):
     try:
         cursor.execute(query, valores)
         conn.commit() # ¡Vital para guardar en MySQL!
-        
+        mov_reg.registrar_movimiento(usuario, f"Actualizó el cliente: {cliente.nombre}", "Clientes")
         # Aquí checo si realmente se actualizó un registro
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Cliente no encontrado")

@@ -5,6 +5,7 @@ from typing import Optional, List
 import os
 from dotenv import load_dotenv
 from datetime import date
+import mov_reg
 
 router =APIRouter(tags=["/cleanest"],responses={404: {"Mensaje":"No encontrado"}})
 load_dotenv()
@@ -28,8 +29,8 @@ class OrdenModel(BaseModel):
     envio2: int
     envio3: int
 
-@router.post("/ordenes")
-async def crear_orden(ordenes: List[OrdenModel]):
+@router.post("/ordenes/{usuario}")
+async def crear_orden(ordenes: List[OrdenModel], usuario: str):
     """
     Ingresa una o varias ordenes de Cleanest Choice para su debido tracking.
     """
@@ -47,6 +48,10 @@ async def crear_orden(ordenes: List[OrdenModel]):
         ]
         cursor.executemany(sql, val_list)
         conn.commit()
+
+        # Registramos el movimiento en el historial de movimientos
+        mov_reg.registrar_movimiento(usuario, f"Registró una orden para {ordenes[0].numero_orden} artículos", "Ordenes Cleanest Choice")
+
         return {
             "msg": "Ordenes creadas",
             "cantidad": len(ordenes),
@@ -68,12 +73,15 @@ async def obtener_pedidos():
     """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
+
     try:
         cursor.execute("SELECT * FROM cleanestChoice")
         return cursor.fetchall()
+    
     except mysql.connector.Error as err:
         print(f"Error en BD: {err}")
         raise HTTPException(status_code=500, detail="Error al obtener las órdenes")
+    
     finally:
         if conn.is_connected():
             cursor.close()
@@ -96,12 +104,19 @@ async def efirma(payload: EfirmaModel):
         query = "UPDATE cleanestChoice SET firma_digital = %s, fecha_firma = %s, usuario = %s WHERE numero_orden = %s"
         cursor.execute(query, (payload.firma_base64,  payload.fecha_firma, payload.usuario, payload.numero_orden))
         conn.commit()
+
+        # Registramos el movimiento en el historial de movimientos
+        mov_reg.registrar_movimiento(payload.usuario, f"Registró una firma para la orden {payload.numero_orden}", "Firmas")
+
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Ticket no encontrado")
         return {"msg": "Firma registrada", "ticket_id": payload.numero_orden}
+    
     except mysql.connector.Error as err:
         print(f"Error en BD: {err}")
+
         raise HTTPException(status_code=500, detail="Error al guardar la firma")
+    
     finally:
         if conn.is_connected():
             cursor.close()
@@ -150,27 +165,38 @@ class OrdenUpdateModel(BaseModel):
     envio2: Optional[int] = None
     envio3: Optional[int] = None
 
-@router.patch("/cleanest/{pedido_id}")
-async def actualizar_pedido(pedido_id: int, payload: OrdenUpdateModel):
+@router.patch("/cleanest/{pedido_id}/{usuario}")
+async def actualizar_pedido(pedido_id: int, payload: OrdenUpdateModel, usuario: str):
     """
     Dependencia para actualizar las ordenes en cuanto a envios de mercancia.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
+
     try:
         campos = {k: v for k, v in payload.model_dump().items() if v is not None}
+
         if not campos:
             raise HTTPException(status_code=400, detail="No se enviaron campos para actualizar")
+        
         set_clause = ", ".join(f"{k} = %s" for k in campos)
         valores = list(campos.values()) + [pedido_id]
         cursor.execute(f"UPDATE cleanestChoice SET {set_clause} WHERE id = %s", valores)
         conn.commit()
+
+        # Registramos el movimiento en el historial de movimientos
+        mov_reg.registrar_movimiento(usuario, f"Actualizó la orden {pedido_id}", "Ordenes Cleanest Choice")
+
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Orden no encontrada")
+        
         return {"msg": "Orden actualizada", "id": pedido_id}
+    
     except mysql.connector.Error as err:
         print(f"Error en BD: {err}")
+
         raise HTTPException(status_code=500, detail="Error al actualizar la orden")
+    
     finally:
         if conn.is_connected():
             cursor.close()

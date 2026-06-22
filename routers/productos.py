@@ -2,7 +2,7 @@
 import mysql.connector
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
-import os
+import os, mov_reg
 from dotenv import load_dotenv
 
 router =APIRouter(tags=["/productos"],responses={404: {"Mensaje":"No encontrado"}})
@@ -24,12 +24,12 @@ class UbicacionEditSchema(BaseModel):
     """Modelo para editar ubicación por sku"""
     warehouse_id: str
     cantidad: int
-
+    usuario: str  # Usuario que edita la ubicación, para registro de movimientos
 
 class ProdEditSchema(BaseModel):
     """Modelo para recibir productos editados desde el frontend"""
     productos: list[dict]
-
+    usuario: str  # Usuario que realiza la edición, para registro de movimientos
 
 class ProdNuevoSchema(BaseModel):
     """Modelo para crear un producto nuevo desde Streamlit"""
@@ -44,6 +44,7 @@ class ProdNuevoSchema(BaseModel):
     precio: float
     precio_2: float
     precio_3: float
+    usuario: str  # Usuario que crea el producto, para registro de movimientos
 
 
 @router.get("/productos")
@@ -184,6 +185,7 @@ async def actualizar_productos(datos: ProdEditSchema):
         
         # Confirmo todos los cambios de una vez
         conn.commit()
+        mov_reg.registrar_movimiento(datos.usuario, f"Actualizó productos: {len(res_actualizados)} actualizados, {len(res_errores)} errores", "Productos")
         
         return {
             "mensaje": "Actualización completada",
@@ -248,7 +250,7 @@ async def crear_producto(prod: ProdNuevoSchema):
         
         cursor.execute(sql_insert, valores)
         conn.commit()
-        
+        mov_reg.registrar_movimiento(prod.usuario, f"Creó producto: {prod.nombre}", "Productos")
         return {
             "mensaje": "Producto creado exitosamente",
             "sku": prod.sku,
@@ -309,6 +311,8 @@ async def nueva_ubicacion(sku: str, datos: UbicacionEditSchema):
         cursor.execute(sql_ins, (sku, datos.warehouse_id, datos.cantidad))
         conn.commit()
 
+        mov_reg.registrar_movimiento(datos.usuario, f"Creó nueva ubicación para SKU '{sku}'", "Productos")
+
         return {
             "mensaje": "Ubicación creada",
             "sku": sku,
@@ -325,8 +329,8 @@ async def nueva_ubicacion(sku: str, datos: UbicacionEditSchema):
         conn.close()
 
 
-@router.delete("/producto/eliminarUbi/{id}")
-async def eliminar_ubicacion(id: int):
+@router.delete("/producto/eliminarUbi/{id}/{usuario}")
+async def eliminar_ubicacion(id: int, usuario: str):
     """
     Borro el registro de stock_ubicacion que tenga ese id.
     Si no existe, aviso con 404.
@@ -341,6 +345,7 @@ async def eliminar_ubicacion(id: int):
             raise HTTPException(status_code=404, detail=f"No existe registro con id '{id}' en stock_ubicacion")
 
         conn.commit()
+        mov_reg.registrar_movimiento(usuario, f"Eliminó ubicación con id '{id}'", "Productos")
         return {"mensaje": "Ubicación eliminada", "id": id}
 
     except mysql.connector.Error as err:
@@ -391,6 +396,7 @@ class DevolucionSchema(BaseModel):
     cantidad: int
     plataforma: str
     reingreso: bool
+    usuario: str  # Usuario que registra la devolución, para registro de movimientos
 
 @router.post("/producto/devolucion/{sku}")
 async def registrar_devolucion(sku: str, datos: DevolucionSchema):
@@ -405,6 +411,8 @@ async def registrar_devolucion(sku: str, datos: DevolucionSchema):
         cursor.execute(sql_ins, (sku, datos.producto, datos.cantidad, datos.plataforma, datos.reingreso))
         conn.commit()
         
+        mov_reg.registrar_movimiento(datos.usuario, f"Registró devolución para SKU '{sku}'", "Productos")
+
         if datos.reingreso == True:
             # Si es reingreso, también actualizo el stock_bodega del producto sumando 1
             cursor.execute("UPDATE productos SET stock_bodega = stock_bodega + %s WHERE sku = %s", (datos.cantidad, sku,))

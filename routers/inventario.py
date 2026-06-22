@@ -2,7 +2,7 @@ import mysql.connector
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
 from typing import List
-import os
+import os, mov_reg
 from dotenv import load_dotenv
 
 router = APIRouter(tags=["/inventario"], responses={404: {"Mensaje": "No encontrado"}})
@@ -54,6 +54,7 @@ async def registrar_conteo(payload: ConteoPayload):
             res_items.append({"sku": item.sku, "msg": "OK"})
 
         conn.commit()
+        mov_reg.registrar_movimiento(payload.usuario, f"Registró conteo de inventario", "Inventario")
         return {"mensaje": "Conteo registrado exitosamente", "items": res_items}
 
     except mysql.connector.Error as err:

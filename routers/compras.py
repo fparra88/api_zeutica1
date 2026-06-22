@@ -85,7 +85,7 @@ async def recibir_compra(compras: List[CompraModel]):
                 "stock_nuevo": stock_nuevo
             })
 
-        conn.commit()
+        conn.commit()        
         return {"msg": "Compra procesada", "items": res_items}
 
     except mysql.connector.Error as err:

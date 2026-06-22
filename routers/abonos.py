@@ -1,8 +1,12 @@
 import mysql.connector
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
-import os
+import os, sys
 from dotenv import load_dotenv
+import mov_reg
+
+# Obtiene la ruta del directorio padre (la raíz)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(mov_reg.__file__), '..')))
 
 router =APIRouter(tags=["/creditos"],responses={404: {"Mensaje":"No encontrado"}})
 load_dotenv()
@@ -15,6 +19,9 @@ def get_db_connection():
         password=os.getenv("DB_PASSWORD"),
         database=os.getenv("DB_NAME")
     )
+
+class usuario(BaseModel):
+    usuario: str    
 
 class abono(BaseModel):
     usuario: str
@@ -49,7 +56,7 @@ async def listar_abonos():
 
     try:
         cursor.execute(query_join)
-        res = cursor.fetchall()
+        res = cursor.fetchall()        
         return res
 
     except mysql.connector.Error as err:
@@ -99,6 +106,10 @@ async def registrar_abono(abono: abono): # Cambié el nombre de la función para
         # 5. Si todo está perfecto, guardamos los cambios en la base de datos de AWS
         conn.commit()
 
+        # Registramos el movimiento en el historial de movimientos
+        mov_reg.registrar_movimiento(abono.usuario, f"Registró un abono de {abono.saldo_abonado} para la venta {abono.id_ventas}", "Abonos")
+
+        # --- seccion de notificaciones ---
         if saldo_restante <= 0:
             cursor.execute(
                 "INSERT INTO notificaciones (empleado_id, titulo, mensaje, tipo) VALUES (%s, %s, %s, %s)",
@@ -107,15 +118,12 @@ async def registrar_abono(abono: abono): # Cambié el nombre de la función para
             conn.commit()
             return {"mensaje": "Deuda saldada", "saldo_pendiente": 0}
 
-        if res:
-            cursor.execute(
-                "INSERT INTO notificaciones (empleado_id, titulo, mensaje, tipo) VALUES (%s, %s, %s, %s)",
-                (2, "Abono Realizado", f"Se ha realizado un abono para la venta {abono.id_ventas}. usuario: {abono.usuario}", "credito")
-            )
-            conn.commit()
-            return {"mensaje": "Abono realizado", "saldo_pendiente": saldo_restante}
-
-        return {"mensaje": "Abono registrado", "saldo_pendiente": float(saldo_restante)}
+        cursor.execute(
+            "INSERT INTO notificaciones (empleado_id, titulo, mensaje, tipo) VALUES (%s, %s, %s, %s)",
+            (2, "Abono Realizado", f"Se ha realizado un abono para la venta {abono.id_ventas}. usuario: {abono.usuario}", "credito")
+        )
+        conn.commit()
+        return {"mensaje": "Abono realizado", "saldo_pendiente": saldo_restante}
 
     except mysql.connector.Error as err:
         conn.rollback() 

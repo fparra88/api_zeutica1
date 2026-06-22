@@ -2,7 +2,7 @@ import mysql.connector
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
 from typing import List
-import os
+import os, mov_reg
 from dotenv import load_dotenv
 
 router =APIRouter(tags=["/traspasos"],responses={404: {"Mensaje":"No encontrado"}})
@@ -64,6 +64,7 @@ async def traspaso_multiple(lote: LoteTraspaso):
 
         # D. Si TODO salió bien, guardamos cambios en MySQL
         connection.commit()
+        mov_reg.registrar_movimiento(lote.usuario, f"Realizó traspaso de {len(lote.movimientos)} items", "Traspasos")
         return {"status": "success", "mensaje": f"{len(lote.movimientos)} movimientos procesados"}
 
     except Exception as e:
@@ -137,6 +138,7 @@ async def traspaso_multiple(lote: LoteTraspaso):
 
         # D. Si TODO salió bien, guardamos cambios en MySQL
         connection.commit()
+        mov_reg.registrar_movimiento(lote.usuario, f"Realizó traspaso a clean de {len(lote.movimientos)} items", "Traspasos")
         return {"status": "success", "mensaje": f"{len(lote.movimientos)} movimientos procesados"}
 
     except Exception as e:

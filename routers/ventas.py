@@ -1,6 +1,6 @@
 import mysql.connector
 from fastapi import APIRouter, HTTPException
-import os
+import os, mov_reg
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -174,7 +174,7 @@ async def registrar_venta(venta: VentaSchema):
 
             # D. Confirmar cambios
             connection.commit()
-
+            mov_reg.registrar_movimiento(venta.usuario, f"Registró venta para SKU '{venta.sku}'", "Ventas")
             return {
                 "message": "Venta aplicada exitosamente", 
                 "sku": venta.sku, 
