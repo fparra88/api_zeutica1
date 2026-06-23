@@ -374,6 +374,7 @@ async def editar_ubicacion(id: str, datos: UbicacionEditSchema):
             raise HTTPException(status_code=404, detail=f"No existe registro en stock_ubicacion para SKU '{id}'")
 
         conn.commit()
+        mov_reg.registrar_movimiento(datos.usuario, f"Editó ubicación con id '{id}' cantidad: {datos.cantidad} en ubicacion {datos.warehouse_id}", "Productos")
         return {
             "mensaje": "Ubicación actualizada",
             "sku": id,

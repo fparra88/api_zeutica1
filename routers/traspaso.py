@@ -143,6 +143,7 @@ async def traspaso_multiple(lote: LoteTraspaso):
 
     except Exception as e:
         connection.rollback() # Si uno falla, ninguno se guarda (mantiene integridad)
+        print(f"Error en traspaso a clean: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         cursor.close()
