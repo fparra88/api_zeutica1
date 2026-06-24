@@ -27,9 +27,29 @@ def registrar_movimiento(nombre_usuario: str, movimiento: str, seccion: str):
         return {"message": "Movimiento registrado exitosamente"}
 
     except mysql.connector.Error as err:
-        # Antes me tragaba el error con un print y nadie se enteraba.
-        # Ahora lo re-lanzo para ver qué truena de verdad.
+        
         print(f"Error al registrar movimiento: {err}")
+        raise
+    
+    finally:
+        cursor.close()
+        conn.close()
+
+def registrar_edicionUbi(sku: str, warehouse_id: str, cama: str, cantidad: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    query = """
+        INSERT INTO ubicaciones_editadas (sku, warehouse_id, cama, cantidad)
+        VALUES (%s, %s, %s, %s)
+    """
+    try:
+        cursor.execute(query, (sku, warehouse_id, cama, cantidad))
+        conn.commit()
+        return {"message": "Ubicación editada exitosamente"}
+
+    except mysql.connector.Error as err:
+        
+        print(f"Error al registrar edición de ubicación: {err}")
         raise
     
     finally:

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException
 import os, mov_reg
 from dotenv import load_dotenv
+from typing import Optional
 
 router =APIRouter(tags=["/productos"],responses={404: {"Mensaje":"No encontrado"}})
 
@@ -22,9 +23,11 @@ def get_db_connection():
 
 class UbicacionEditSchema(BaseModel):
     """Modelo para editar ubicación por sku"""
+    sku: Optional[str]  # SKU del producto, opcional porque a veces solo queremos editar por id
     warehouse_id: str
     cantidad: int
     usuario: str  # Usuario que edita la ubicación, para registro de movimientos
+    cama: int
 
 class ProdEditSchema(BaseModel):
     """Modelo para recibir productos editados desde el frontend"""
@@ -307,8 +310,8 @@ async def nueva_ubicacion(sku: str, datos: UbicacionEditSchema):
     cursor = conn.cursor()
 
     try:
-        sql_ins = "INSERT INTO stock_ubicacion (sku, warehouse_id, cantidad) VALUES (%s, %s, %s)"
-        cursor.execute(sql_ins, (sku, datos.warehouse_id, datos.cantidad))
+        sql_ins = "INSERT INTO stock_ubicacion (sku, warehouse_id, cama, cantidad) VALUES (%s, %s, %s, %s)"
+        cursor.execute(sql_ins, (sku, datos.warehouse_id, datos.cama, datos.cantidad))
         conn.commit()
 
         mov_reg.registrar_movimiento(datos.usuario, f"Creó nueva ubicación para SKU '{sku}'", "Productos")
@@ -317,6 +320,7 @@ async def nueva_ubicacion(sku: str, datos: UbicacionEditSchema):
             "mensaje": "Ubicación creada",
             "sku": sku,
             "warehouse_id": datos.warehouse_id,
+            "cama": datos.cama,
             "cantidad": datos.cantidad
         }
 
@@ -367,18 +371,20 @@ async def editar_ubicacion(id: str, datos: UbicacionEditSchema):
     cursor = conn.cursor()
 
     try:
-        sql_upd = "UPDATE stock_ubicacion SET warehouse_id = %s, cantidad = %s WHERE id = %s"
-        cursor.execute(sql_upd, (datos.warehouse_id, datos.cantidad, id))
+        sql_upd = "UPDATE stock_ubicacion SET warehouse_id = %s, cama = %s, cantidad = %s WHERE id = %s"
+        cursor.execute(sql_upd, (datos.warehouse_id, datos.cama, datos.cantidad, id))
 
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail=f"No existe registro en stock_ubicacion para SKU '{id}'")
 
         conn.commit()
-        mov_reg.registrar_movimiento(datos.usuario, f"Editó ubicación con id '{id}' cantidad: {datos.cantidad} en ubicacion {datos.warehouse_id}", "Productos")
+        mov_reg.registrar_movimiento(datos.usuario, f"Editó ubicación con id '{id}', cama: {datos.cama}, cantidad: {datos.cantidad} en ubicacion {datos.warehouse_id}", "Productos")
+        mov_reg.registrar_edicionUbi(datos.sku, datos.warehouse_id, datos.cama, datos.cantidad)
         return {
             "mensaje": "Ubicación actualizada",
             "sku": id,
             "warehouse_id": datos.warehouse_id,
+            "cama": datos.cama,
             "cantidad": datos.cantidad
         }
 
@@ -451,6 +457,30 @@ async def obtener_devoluciones():
             raise HTTPException(status_code=404, detail="No se han registrado devoluciones")
 
         return devoluciones
+
+    except mysql.connector.Error as err:
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.get("/ubicaciones/registro/{sku}")
+async def obtener_ubicaciones_registro(sku: str):
+    """
+    Traigo todas las ubicaciones registradas para un SKU específico.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    try:
+        cursor.execute("SELECT * FROM ubicaciones_editadas WHERE sku = %s", (sku,))
+        ubicaciones = cursor.fetchall()
+
+        if not ubicaciones:
+            raise HTTPException(status_code=404, detail=f"No se encontraron ubicaciones para SKU '{sku}'")
+
+        return ubicaciones
 
     except mysql.connector.Error as err:
         raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")

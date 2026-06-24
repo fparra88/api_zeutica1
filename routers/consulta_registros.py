@@ -24,7 +24,7 @@ async def consulta_registros():
     # Uso dictionary=True para devolver llaves nombradas y armar el JSON directo
     cursor = conn.cursor(dictionary=True)
 
-    query = "SELECT * FROM movimientos_registro"
+    query = "SELECT * FROM movimientos_registro order by fecha desc LIMIT 100"  # Limito a 100 registros para no saturar la respuestas
 
     try:
         cursor.execute(query)
