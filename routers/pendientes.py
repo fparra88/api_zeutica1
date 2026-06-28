@@ -1,0 +1,81 @@
+import mysql.connector
+from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+from typing import Optional, List
+import os
+from dotenv import load_dotenv
+from datetime import date
+import mov_reg
+
+router =APIRouter(tags=["/pendientes"],responses={404: {"Mensaje":"No encontrado"}})
+load_dotenv()
+
+# Configuración de la conexión
+def get_db_connection():
+    return mysql.connector.connect(
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        database=os.getenv("DB_NAME")
+    )
+
+@router.get("/pendientes-registro")
+async def pendientes():
+    """
+    Traigo los pendientes con su estado y prioridad.
+    """
+    conn = get_db_connection()
+    # Uso dictionary=True para devolver llaves nombradas y armar el JSON directo
+    cursor = conn.cursor(dictionary=True)
+
+    # JOIN por el FK id_ventas: del pendiente saco el saldo pendiente, de la venta el resto
+    query = """
+        SELECT * FROM pendientes ORDER BY prioridad DESC, fecha ASC LIMIT 100
+    """
+
+    try:
+        cursor.execute(query)
+        res = cursor.fetchall()        
+        return res
+
+    except mysql.connector.Error as err:
+        print(f"Error DB pendientes: {err}")
+        raise HTTPException(status_code=500, detail="Error interno en DB")  
+    
+    finally:
+        cursor.close()
+        conn.close()
+
+class registro(BaseModel):
+    usuario: str
+    actividad: str
+    prioridad: str  
+    estado: str
+    observaciones: Optional[str] = None
+    fecha_promesa: Optional[date] = None
+
+@router.post("/pendientes-agregar")
+async def agregar_pendiente(registro: registro):
+    """
+    Agrego un pendiente a la tabla pendientes.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    query = """
+        INSERT INTO pendientes (usuario, actividad, prioridad, estado, observaciones, fecha_promesa)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """
+
+    try:
+        cursor.execute(query, (registro.usuario, registro.actividad, registro.prioridad, registro.estado, registro.observaciones, registro.fecha_promesa))
+        conn.commit()
+        return {"mensaje": "Pendiente agregado exitosamente."}
+
+    except mysql.connector.Error as err:
+        print(f"Error DB agregar pendiente: {err}")
+        raise HTTPException(status_code=500, detail="Error interno en DB")  
+    
+    finally:
+        cursor.close()
+        conn.close()
