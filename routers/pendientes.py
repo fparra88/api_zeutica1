@@ -57,7 +57,7 @@ class registro(BaseModel):
 @router.post("/pendientes-agregar")
 async def agregar_pendiente(registro: registro):
     """
-    Agrego un pendiente a la tabla pendientes.
+    Agrego un registro a la tabla pendientes.
     """
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -70,10 +70,62 @@ async def agregar_pendiente(registro: registro):
     try:
         cursor.execute(query, (registro.usuario, registro.actividad, registro.prioridad, registro.estado, registro.observaciones, registro.fecha_promesa))
         conn.commit()
-        return {"mensaje": "Pendiente agregado exitosamente."}
+        return {"mensaje": "Registro agregado exitosamente."}
 
     except mysql.connector.Error as err:
-        print(f"Error DB agregar pendiente: {err}")
+        print(f"Error DB agregar registro: {err}")
+        raise HTTPException(status_code=500, detail="Error interno en DB")  
+    
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.patch("/pendientes-actualizar/{id_pendiente}")
+async def actualizar_pendiente(id_pendiente: int, registro: registro):
+    """
+    Actualizo un registro en la tabla pendientes.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    query = """
+        UPDATE pendientes
+        SET usuario = %s, actividad = %s, prioridad = %s, estado = %s, observaciones = %s, fecha_promesa = %s
+        WHERE id = %s
+    """
+
+    try:
+        cursor.execute(query, (registro.usuario, registro.actividad, registro.prioridad, registro.estado, registro.observaciones, registro.fecha_promesa, id_pendiente))
+        conn.commit()
+        return {"mensaje": "Pendiente actualizado exitosamente."}
+
+    except mysql.connector.Error as err:
+        print(f"Error DB actualizar pendiente: {err}")
+        raise HTTPException(status_code=500, detail="Error interno en DB")  
+    
+    finally:
+        cursor.close()
+        conn.close()
+
+@router.delete("/pendientes-eliminar/{id_pendiente}")
+async def eliminar_pendiente(id_pendiente: int):
+    """
+    Elimino un registro de la tabla pendientes.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    query = """
+        DELETE FROM pendientes WHERE id = %s
+    """
+
+    try:
+        cursor.execute(query, (id_pendiente,))
+        conn.commit()
+        return {"mensaje": "Pendiente eliminado exitosamente."}
+
+    except mysql.connector.Error as err:
+        print(f"Error DB eliminar pendiente: {err}")
         raise HTTPException(status_code=500, detail="Error interno en DB")  
     
     finally:

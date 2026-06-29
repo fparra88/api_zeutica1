@@ -82,7 +82,7 @@ async def consulta_traspasos():
     connection = get_db_connection()
     cursor = connection.cursor(dictionary=True)
 
-    sql = ("SELECT sku, cantidad, almacen, fecha_registro FROM stock_actual")
+    sql = ("SELECT sku, cantidad, almacen, fecha_registro FROM stock_actual ORDER BY fecha_registro DESC LIMIT 100")
 
     try:
         cursor.execute(sql)

@@ -24,7 +24,7 @@ async def consultar_ventas(f1: str, f2: str):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True) # Usamos dictionary=True para que devuelva claves como 'sku'
     
-    query = "SELECT * FROM ventasRegistro WHERE DATE(fecha_registro) BETWEEN %s AND %s"
+    query = "SELECT * FROM ventasRegistro WHERE DATE(fecha_registro) BETWEEN %s AND %s ORDER BY fecha_registro DESC"
     
     try:
         cursor.execute(query,(f1, f2))
