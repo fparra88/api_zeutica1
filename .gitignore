@@ -4,3 +4,7 @@ CLAUDE.MD
 __pycache__
 *.pyc
 .claude/skills.md
+node_modules/
+dist/
+venv/
+.venv/
