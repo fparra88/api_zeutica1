@@ -52,6 +52,7 @@ async def listar_abonos():
             v.saldo_pendiente
         FROM abonos a
         INNER JOIN ventasRegistro v ON a.id_ventas = v.id_ventas
+        ORDER BY a.id DESC
     """
 
     try:
@@ -61,6 +62,7 @@ async def listar_abonos():
 
     except mysql.connector.Error as err:
         # Si truena la DB, me entero aquí qué pasó
+        print(f"Error en DB: {err}")
         raise HTTPException(status_code=500, detail=f"Error en DB: {err}")
 
     finally:

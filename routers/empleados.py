@@ -36,7 +36,7 @@ async def empleados_con_usuarios():
             e.nss,
             e.estatus,
             u.nombre_usuario AS usuario,            
-            u.rol          -- Suponiendo que tienes un campo rol en usuarios            
+            u.rol                     
         FROM empleados e
         INNER JOIN usuarios u ON e.usuario = u.nombre_usuario
     """
@@ -173,7 +173,7 @@ async def obtener_registro_login():
     cursor = conn.cursor(dictionary=True)
 
     try:
-        query = "SELECT * FROM registro_login"
+        query = "SELECT * FROM registro_login ORDER BY fecha DESC"
         cursor.execute(query)
         resultados = cursor.fetchall()
 

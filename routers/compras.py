@@ -184,7 +184,7 @@ async def obtener_compras():
         # Buscamos las compras
         query = """
             SELECT id, sku, nombre, stock_bodega, costo_total, num_factura, proveedor, (subtotal*(1+(iva_pct/100))) AS total
-            FROM compras                    
+            FROM compras ORDER BY fecha_registro DESC                    
             
         """
         cursor.execute(query)

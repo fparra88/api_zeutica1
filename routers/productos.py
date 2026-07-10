@@ -450,7 +450,7 @@ async def obtener_devoluciones():
     cursor = conn.cursor(dictionary=True)
 
     try:
-        cursor.execute("SELECT * FROM devoluciones")
+        cursor.execute("SELECT * FROM devoluciones ORDER BY fecha DESC")
         devoluciones = cursor.fetchall()
 
         if not devoluciones:

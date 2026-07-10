@@ -72,7 +72,7 @@ async def cons_gastos(usuario: str):
     cursor = conn.cursor(dictionary=True)
     
     # Aquí traigo solo los gastos del usuario que consulta
-    query = "SELECT descripcion, costo, cantidad, total, usuario_registro FROM gastos WHERE usuario_registro = %s"
+    query = "SELECT descripcion, costo, cantidad, total, usuario_registro FROM gastos WHERE usuario_registro = %s ORDER BY fecha_registro DESC"
     
     try:
         cursor.execute(query, (usuario,))

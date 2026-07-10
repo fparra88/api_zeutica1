@@ -50,7 +50,7 @@ async def obtener_clientes():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True) 
 
-    query = "SELECT * FROM clientes"
+    query = "SELECT * FROM clientes ORDER BY nombre ASC"  # Ordenamos por nombre de cliente
 
     try:
         cursor.execute(query)
@@ -62,6 +62,7 @@ async def obtener_clientes():
         return clientes
     
     except mysql.connector.Error as err:
+        print(f"Error DB clientes: {err}")
         raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
     
     finally:

@@ -150,7 +150,7 @@ async def consulta_cotizacion():
     connection = get_db_connection()
     try:
         with connection.cursor(dictionary=True) as cursor:
-            cursor.execute("SELECT * FROM cotizaciones")
+            cursor.execute("SELECT * FROM cotizaciones ORDER BY id DESC")
             cotizaciones = cursor.fetchall()
 
             if not cotizaciones:
