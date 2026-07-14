@@ -145,46 +145,66 @@ async def guardar_cotizacion(cot: CotizacionSchema):
 @router.get("/consulta/cotizacion")
 async def consulta_cotizacion():
     """
-    Dependencia para consultar cotizaciones con sus items.
+    Dependencia para consultar cotizaciones con sus items agrupados.
     """
     connection = get_db_connection()
     try:
         with connection.cursor(dictionary=True) as cursor:
-            cursor.execute("SELECT * FROM cotizaciones ORDER BY id DESC")
-            cotizaciones = cursor.fetchall()
+            # ✅ BUG 1 CORREGIDO: Agregamos c.id al SELECT para poder usarlo en Python
+            cursor.execute("""
+                SELECT 
+                    c.id, 
+                    c.codigo_cotizacion, 
+                    c.empresa, 
+                    c.fecha, 
+                    c.subtotal, 
+                    c.total,
+                    i.nombre_producto
+                FROM cotizaciones c                  
+                JOIN cotizacion_items i ON c.id = i.cotizacion_id 
+                ORDER BY c.codigo_cotizacion DESC;
+            """)
+            
+            # ✅ BUG 2 CORREGIDO: Un solo fetchall trae toda la información combinada
+            filas_combinadas = cursor.fetchall()
 
-            if not cotizaciones:
+            if not filas_combinadas:
                 raise HTTPException(status_code=404, detail="No se encontraron cotizaciones")
 
-            # Convierto tipos no serializables en maestro
-            for c in cotizaciones:
-                for key, value in c.items():
-                    if isinstance(value, (Decimal, datetime.date)):
-                        c[key] = str(value)
+            # Estructura para agrupar los ítems dentro de su cotización correspondiente
+            cotizaciones_acumuladas = {}
 
-            # Ahora traigo todos los items de una vez para evitar consultas repetidas
-            todos_items = cursor.fetchall()
+            for fila in filas_combinadas:
+                id_cotizacion = fila["id"]
+                
+                # Si es la primera vez que vemos esta cotización, creamos su base
+                if id_cotizacion not in cotizaciones_acumuladas:
+                    cotizaciones_acumuladas[id_cotizacion] = {
+                        "id": id_cotizacion,
+                        "codigo_cotizacion": fila["codigo_cotizacion"],
+                        "empresa": fila["empresa"],
+                        "fecha": str(fila["fecha"]) if isinstance(fila["fecha"], (datetime.date, datetime.datetime)) else fila["fecha"],
+                        "subtotal": str(fila["subtotal"]) if isinstance(fila["subtotal"], Decimal) else fila["subtotal"],
+                        "total": str(fila["total"]) if isinstance(fila["total"], Decimal) else fila["total"],
+                        "items": [] # Lista vacía lista para recibir sus productos
+                    }
+                
+                # Extraemos el ítem y lo metemos a la lista de esa cotización
+                if fila["nombre_producto"]:
+                    cotizaciones_acumuladas[id_cotizacion]["items"].append({
+                        "nombre_producto": fila["nombre_producto"]
+                    })
 
-            # Convierto tipos en items y los agrupo por cotizacion_id
-            items_map: dict = {c["id"]: [] for c in cotizaciones}
-            for item in todos_items:
-                for key, value in item.items():
-                    if isinstance(value, (Decimal, datetime.date)):
-                        item[key] = str(value)
-                items_map[item["cotizacion_id"]].append(item)
+            # Convertimos el diccionario acumulador en una lista limpia para retornar como JSON
+            lista_final = list(cotizaciones_acumuladas.values())
 
-            # Inyecto lista de items en cada cotización
-            for c in cotizaciones:
-                c["items"] = items_map.get(c["id"], [])
-
-            return {"cotizaciones": cotizaciones}
+            return {"cotizaciones": lista_final}
 
     except Exception as e:
         print(f"Error detectado: {e}")
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
     finally:
         connection.close()
-
 
 @router.post("/relacionFactura")
 async def vincular_factura(vinculos: List[VinculoFactura]):
@@ -304,6 +324,29 @@ async def guardar_cotizacion(vendido: vendido):
     except Exception as e:
         connection.rollback()
         print(f"Error inesperado: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    finally:
+        connection.close()
+
+@router.get("/cotizaciones/base64/{codigo_cotizacion}")
+async def obtener_pdf_base64(codigo_cotizacion: str):
+    """
+    Obtiene el PDF en base64 de la cotización especificada.
+    """
+    connection = get_db_connection()
+    try:
+        with connection.cursor(dictionary=True) as cursor:
+            cursor.execute("SELECT pdf FROM cotizaciones WHERE codigo_cotizacion = %s", (codigo_cotizacion,))
+            resultado = cursor.fetchone()
+            
+            if not resultado or not resultado.get("pdf"):
+                raise HTTPException(status_code=404, detail=f"No se encontró PDF para la cotización {codigo_cotizacion}")
+            
+            return {"pdf_base64": resultado["pdf"]}
+    
+    except Exception as e:
+        print(f"Error al obtener PDF: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
     finally:
