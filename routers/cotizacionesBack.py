@@ -329,6 +329,72 @@ async def guardar_cotizacion(vendido: vendido):
     finally:
         connection.close()
 
+@router.get("/cotizaciones/ventas")
+async def cotizaciones_para_venta():
+    """
+    Exclusivo para la seccion de Ventas: cotizaciones abiertas (no vendidas)
+    con sus items completos para cargar directo al carrito.
+    No incluye el pdf para mantener la respuesta ligera.
+    """
+    connection = get_db_connection()
+    try:
+        with connection.cursor(dictionary=True) as cursor:
+            cursor.execute("""
+                SELECT
+                    c.id,
+                    c.codigo_cotizacion,
+                    c.empresa,
+                    c.fecha,
+                    c.subtotal,
+                    c.total,
+                    c.vendido,
+                    i.sku,
+                    i.nombre_producto,
+                    i.cantidad,
+                    i.precio_unitario,
+                    i.total_linea
+                FROM cotizaciones c
+                LEFT JOIN cotizacion_items i ON c.id = i.cotizacion_id
+                WHERE c.vendido = 0 OR c.vendido IS NULL
+                ORDER BY c.codigo_cotizacion DESC;
+            """)
+            filas = cursor.fetchall()
+
+            # Agrupo los items dentro de su cotización correspondiente
+            cotizaciones_acumuladas = {}
+            for fila in filas:
+                id_cotizacion = fila["id"]
+
+                if id_cotizacion not in cotizaciones_acumuladas:
+                    cotizaciones_acumuladas[id_cotizacion] = {
+                        "id": id_cotizacion,
+                        "codigo_cotizacion": fila["codigo_cotizacion"],
+                        "empresa": fila["empresa"],
+                        "fecha": str(fila["fecha"]) if isinstance(fila["fecha"], (datetime.date, datetime.datetime)) else fila["fecha"],
+                        "subtotal": str(fila["subtotal"]) if isinstance(fila["subtotal"], Decimal) else fila["subtotal"],
+                        "total": str(fila["total"]) if isinstance(fila["total"], Decimal) else fila["total"],
+                        "vendido": fila["vendido"],
+                        "items": []
+                    }
+
+                # LEFT JOIN puede dejar sku en None si la cotización no tiene items
+                if fila["sku"]:
+                    cotizaciones_acumuladas[id_cotizacion]["items"].append({
+                        "sku": fila["sku"],
+                        "nombre_producto": fila["nombre_producto"],
+                        "cantidad": fila["cantidad"],
+                        "precio_unitario": float(fila["precio_unitario"]) if isinstance(fila["precio_unitario"], Decimal) else fila["precio_unitario"],
+                        "total_linea": float(fila["total_linea"]) if isinstance(fila["total_linea"], Decimal) else fila["total_linea"],
+                    })
+
+            return {"cotizaciones": list(cotizaciones_acumuladas.values())}
+
+    except Exception as e:
+        print(f"Error en cotizaciones/ventas: {e}")
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    finally:
+        connection.close()
+
 @router.get("/cotizaciones/base64/{codigo_cotizacion}")
 async def obtener_pdf_base64(codigo_cotizacion: str):
     """
