@@ -20,7 +20,7 @@ def get_db_connection():
     )
 
 @router.get("/pendientes-registro")
-async def pendientes():
+async def pendientes(estado: str):
     """
     Traigo los pendientes con su estado y prioridad.
     """
@@ -30,11 +30,11 @@ async def pendientes():
 
     # JOIN por el FK id_ventas: del pendiente saco el saldo pendiente, de la venta el resto
     query = """
-        SELECT * FROM pendientes ORDER BY prioridad DESC, fecha ASC LIMIT 100
+        SELECT * FROM pendientes WHERE estado = %s ORDER BY fecha ASC LIMIT 100
     """
 
     try:
-        cursor.execute(query)
+        cursor.execute(query, (estado,))
         res = cursor.fetchall()        
         return res
 
