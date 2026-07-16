@@ -61,7 +61,7 @@ def _init_tablas():
         conn.close()
 
 
-_init_tablas()
+#_init_tablas()
 
 
 class CuentaPagar(BaseModel):

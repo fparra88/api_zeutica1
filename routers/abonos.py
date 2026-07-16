@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 import mov_reg
 
 # Obtiene la ruta del directorio padre (la raíz)
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(mov_reg.__file__), '..')))
+#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(mov_reg.__file__), '..')))
 
 router =APIRouter(tags=["/creditos"],responses={404: {"Mensaje":"No encontrado"}})
 load_dotenv()

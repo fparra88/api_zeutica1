@@ -69,6 +69,33 @@ async def obtener_clientes():
         cursor.close()
         conn.close()
 
+@router.get("/clientes-potenciales")
+async def obtener_clientes_potenciales():
+    """
+    Consulta los clientes potenciales registrados en DB.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True) 
+
+    query = "SELECT * FROM clientes_potenciales ORDER BY nombre_comprador ASC LIMIT 1000"  # Ordenamos por nombre de cliente
+
+    try:
+        cursor.execute(query)
+        clientes_potenciales = cursor.fetchall() 
+
+        if not clientes_potenciales:
+            raise HTTPException(status_code=404, detail="No se han encontrado clientes potenciales en la base de datos.")  
+        
+        return clientes_potenciales
+    
+    except mysql.connector.Error as err:
+        print(f"Error DB clientes potenciales: {err}")
+        raise HTTPException(status_code=500, detail=f"Error de base de datos: {err}")
+    
+    finally:
+        cursor.close()
+        conn.close() 
+
 
 @router.post("/clientenuevo/{usuario}") # Enpoint para agregar cliente a la base de datos
 async def cliente_nuevo(cliente: clienteRfc, usuario: str):
