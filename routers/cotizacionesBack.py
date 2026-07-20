@@ -150,22 +150,26 @@ async def consulta_cotizacion():
     connection = get_db_connection()
     try:
         with connection.cursor(dictionary=True) as cursor:
-            # ✅ BUG 1 CORREGIDO: Agregamos c.id al SELECT para poder usarlo en Python
+            # Agregamos c.id al SELECT para poder usarlo en Python
             cursor.execute("""
                 SELECT 
                     c.id, 
                     c.codigo_cotizacion, 
+                    c.relacion_factura,
+                    c.metodo_pago,
+                    c.fecha_pago,
                     c.empresa, 
                     c.fecha, 
                     c.subtotal, 
                     c.total,
+                    c.firma_envio,
                     i.nombre_producto
                 FROM cotizaciones c                  
                 JOIN cotizacion_items i ON c.id = i.cotizacion_id 
                 ORDER BY c.codigo_cotizacion DESC;
             """)
             
-            # ✅ BUG 2 CORREGIDO: Un solo fetchall trae toda la información combinada
+            # CORREGIDO: Un solo fetchall trae toda la información combinada
             filas_combinadas = cursor.fetchall()
 
             if not filas_combinadas:
@@ -182,6 +186,10 @@ async def consulta_cotizacion():
                     cotizaciones_acumuladas[id_cotizacion] = {
                         "id": id_cotizacion,
                         "codigo_cotizacion": fila["codigo_cotizacion"],
+                        "relacion_factura": fila["relacion_factura"],
+                        "metodo_pago": fila["metodo_pago"],
+                        "fecha_pago": str(fila["fecha_pago"]) if isinstance(fila["fecha_pago"], (datetime.date, datetime.datetime)) else fila["fecha_pago"],
+                        "firma_envio": fila["firma_envio"],
                         "empresa": fila["empresa"],
                         "fecha": str(fila["fecha"]) if isinstance(fila["fecha"], (datetime.date, datetime.datetime)) else fila["fecha"],
                         "subtotal": str(fila["subtotal"]) if isinstance(fila["subtotal"], Decimal) else fila["subtotal"],
